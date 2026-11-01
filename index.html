@@ -218,6 +218,13 @@ button{ font:inherit; color:inherit; }
 .trip-status.is-example{ background:var(--sample-soft); border:1px solid var(--sample-line); border-radius:var(--r); padding:10px 14px; color:var(--ink); }
 .trip-status.is-error{ color:var(--bad); font-weight:700; }
 .key-help{ display:block; margin-top:6px; color:var(--ink); font-weight:400; }
+.check{ display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-weight:700; line-height:1.35; }
+.check input{ width:22px; height:22px; margin:0; flex:none; accent-color:var(--plaque); }
+.check .fine{ display:block; font-weight:400; margin-top:2px; }
+.j-why{ font-size:.94rem; line-height:1.45; color:var(--ink); }
+.stlink{ background:none; border:0; padding:0; font:inherit; font-weight:700; color:var(--ink); text-align:left; cursor:pointer; text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--accent) 45%, transparent); text-decoration-thickness:1.5px; text-underline-offset:3px; }
+.stlink:hover{ color:var(--accent); }
+.back{ align-self:flex-start; text-decoration:none; padding:2px 0; }
 .trip-status a{ color:var(--accent); }
 .trip-status .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--unk); margin-right:6px; }
 .journeys{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
@@ -281,6 +288,7 @@ button{ font:inherit; color:inherit; }
           <input id="to" class="input" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Station, address or place">
           <ul id="to-sug" class="results" hidden></ul>
         </div>
+        <label class="check" for="bus"><input type="checkbox" id="bus" checked><span>Include buses <span class="fine">(no stairs, but space for prams can be tight at busy times)</span></span></label>
         <button type="submit" class="btn-primary">Find pram-friendly routes</button>
       </form>
     </section>
@@ -838,6 +846,7 @@ function renderStation(){
   const lines = st.lines.length ? `<div class="j-lines" aria-label="Lines at this station">${st.lines.map(lineBadge).join('')}</div>` : '';
   const liftList = st.counts.n ? `<ul class="lifts">${lifts}</ul>` : '<p class="hint">IDFM lists no lifts at this station.</p>';
   el.innerHTML = `
+    ${state.backToTrip ? '<button type="button" id="back-trip" class="linkbtn back">‹ Back to your trip</button>' : ''}
     <div class="st-head">
       <h2 class="plaque plaque-lg">${esc(st.name)}</h2>
       <button type="button" class="save" id="save" aria-pressed="${saved}">${ICON.star}<span>${saved ? 'Saved' : 'Save'}</span></button>
@@ -1105,7 +1114,10 @@ function wireConnection(){
 const NAVITIA = 'https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia';
 const PLACE_TYPES = { stop_area:'Station', stop_point:'Stop', address:'Address', poi:'Place', administrative_region:'Area' };
 const KIND_COST = { bad:100, none:60, warn:25, unk:15 };
-state.trip = { from:null, to:null, results:null, status:'example', message:'' };
+const BUS_KEY = 'lift-or-stairs:bus';
+state.trip = { from:null, to:null, results:null, status:'example', message:'', includeBus:true };
+try { if (localStorage.getItem(BUS_KEY) === '0') state.trip.includeBus = false; } catch (e){}
+const isBusLeg = l => /bus|noctilien|coach|autocar/.test(fold(`${l.mode} ${l.physical || ''}`));
 state.sug = { from:[], to:[] };
 
 function navitia(path, params){
@@ -1142,7 +1154,7 @@ function normJourney(j, stepFree){
     const min = Math.round((s.duration || 0) / 60);
     if (s.type === 'public_transport' || s.type === 'on_demand_transport'){
       const di = s.display_informations || {};
-      legs.push({ type:'pt', mode:di.commercial_mode || di.physical_mode || '', code:di.code || di.label || '', color:di.color || '', text:di.text_color || '',
+      legs.push({ type:'pt', mode:di.commercial_mode || di.physical_mode || '', physical:di.physical_mode || '', code:di.code || di.label || '', color:di.color || '', text:di.text_color || '',
         direction:di.direction || '', from:navPlace(s.from), to:navPlace(s.to), stops:Math.max(0, (s.stop_date_times || []).length - 1), min });
     } else if (s.type === 'street_network' || s.type === 'crow_fly'){
       if (min > 0){ walk += min; legs.push({ type:'walk', min, to:navPlace(s.to).name }); }
@@ -1158,9 +1170,16 @@ const journeySig = j => j.legs.filter(l => l.type === 'pt').map(l => `${l.code}|
 const placeRef = p => p.id || `${p.lon};${p.lat}`;
 
 // Two requests: step-free only (wheelchair=true) and unrestricted; merged, then ranked for a pram.
-async function findJourneys(from, to){
-  const base = [['from', placeRef(from)], ['to', placeRef(to)], ['count', '3']];
-  const [free, any] = await Promise.allSettled([navitia('/journeys', base.concat([['wheelchair', 'true']])), navitia('/journeys', base)]);
+async function findJourneys(from, to, includeBus){
+  includeBus = includeBus !== false;
+  const run = forbidBus => {
+    const base = [['from', placeRef(from)], ['to', placeRef(to)], ['count', '3']];
+    if (forbidBus) base.push(['forbidden_uris[]', 'physical_mode:Bus']);
+    return Promise.allSettled([navitia('/journeys', base.concat([['wheelchair', 'true']])), navitia('/journeys', base)]);
+  };
+  let [free, any] = await run(!includeBus);
+  // If the planner rejects the bus filter itself, ask again without it and filter buses out here instead.
+  if (!includeBus && free.status === 'rejected' && any.status === 'rejected' && free.reason && free.reason.status === 400) [free, any] = await run(false);
   if (free.status === 'rejected' && any.status === 'rejected'){
     const e = free.reason || any.reason;
     if (e && e.status === 404) return [];
@@ -1178,7 +1197,8 @@ async function findJourneys(from, to){
   };
   add(free, true);
   add(any, false);
-  return [...map.values()];
+  const list = [...map.values()];
+  return includeBus ? list : list.filter(j => !j.legs.some(l => l.type === 'pt' && isBusLeg(l)));
 }
 
 function matchStation(p){
@@ -1201,7 +1221,7 @@ function matchStation(p){
 const isStreetMode = mode => /bus|tram|noctilien|navette|cable/.test(fold(mode));
 
 function checkStop(p, mode){
-  if (isStreetMode(mode)) return { kind:'street', cls:'ok', label:'Street level', st:null };
+  if (isStreetMode(mode)) return { kind:'street', cls:'ok', label:'Street level', st:matchStation(p) };
   const st = matchStation(p);
   if (!st) return { kind:'none', cls:'warn', label:'No lift listed', st:null };
   const { ok, out, unk, n } = st.counts;
@@ -1239,8 +1259,49 @@ function rankJourneys(list){
   });
   items.sort((a, b) => a.score - b.score);
   if (items.length && !items[0].checks.some(c => c.kind === 'bad' || c.kind === 'none')) items[0].best = true;
+  for (const it of items) it.comment = tripComment(it, items[0]);
   return items;
 }
+
+// One or two plain sentences on why a route is (or isn't) easy with a pram.
+function tripComment(item, top){
+  const { j, checks } = item;
+  const names = test => checks.filter(test).map(c => c.name);
+  const list = a => a.length <= 1 ? (a[0] || '') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
+  const verb = (a, one, many) => a.length > 1 ? many : one;
+  const bad = names(c => c.kind === 'bad');
+  const noLift = names(c => c.kind === 'none' && c.st);
+  const unlisted = names(c => c.kind === 'none' && !c.st);
+  const warn = names(c => c.kind === 'warn');
+  const unk = names(c => c.kind === 'unk');
+  const okN = checks.filter(c => c.kind === 'ok').length;
+  const street = checks.some(c => c.kind === 'street');
+  const parts = [];
+  if (bad.length) parts.push(`Not pram-friendly right now: the lift${bad.length > 1 ? 's' : ''} at ${list(bad)} ${verb(bad, 'is', 'are')} out of service.`);
+  if (noLift.length) parts.push(`${bad.length ? 'Also, ' : 'Expect stairs: '}${list(noLift)} ${verb(noLift, 'has', 'have')} no lift.`);
+  if (unlisted.length) parts.push(`${bad.length || noLift.length ? '' : 'Possible stairs: '}${list(unlisted)} ${verb(unlisted, 'has', 'have')} no lift in IDFM's list.`);
+  if ((bad.length || noLift.length || unlisted.length) && warn.length) parts.push(`Some lifts are also out at ${list(warn)}.`);
+  if (!bad.length && !noLift.length && !unlisted.length){
+    if (warn.length) parts.push(`Probably fine: some lifts are out at ${list(warn)}. Tap the station to check whether it's the one you need.`);
+    else if (okN && street) parts.push('Good with a pram: lifts are working at every station, and bus or tram stops are at street level.');
+    else if (okN) parts.push(`Good with a pram: lifts were working at ${okN === 1 ? 'the station' : okN === 2 ? 'both stations' : `all ${okN} stations`} at the last check.`);
+    else if (street) parts.push('Good with a pram: buses and trams stop at street level, so there are no stairs or lifts to rely on.');
+    else if (!checks.length) parts.push('Walking only, so no stairs or lifts.');
+    if (unk.length) parts.push(`${list(unk)} had no lift status at the last check.`);
+  }
+  const extra = [];
+  if (checks.length && j.transfers === 0) extra.push('no changes');
+  else if (j.transfers >= 2) extra.push(`${j.transfers} changes, so more lifts to rely on`);
+  if (j.walkMin >= 10) extra.push(`${j.walkMin} min of walking`);
+  if (!j.stepFree && checks.length) extra.push("IDFM doesn't mark it as step-free");
+  if (item !== top && j.durMin < top.j.durMin) extra.push(`${top.j.durMin - j.durMin} min faster than the top route`);
+  if (extra.length) parts.push(extra.join(', ').replace(/^./, c => c.toUpperCase()) + '.');
+  return parts.join(' ');
+}
+
+const stationLink = (name, st) => st
+  ? `<button type="button" class="stlink" data-id="${esc(st.id)}" data-from-trip="1">${esc(name)}</button>`
+  : `<b>${esc(name)}</b>`;
 
 const fmtTime = d => d ? d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
 const hexColor = c => /^[0-9a-f]{6}$/i.test(c || '') ? '#' + c : null;
@@ -1265,10 +1326,11 @@ function stepsHtml(j, checks){
   return j.legs.map(l => {
     if (l.type === 'walk') return `<li class="step"><span class="step-k">Walk</span><span>${l.min} min${l.to ? ` to ${esc(l.to)}` : ''}</span></li>`;
     if (l.type === 'transfer') return `<li class="step"><span class="step-k">Change</span><span>Walk ${l.min} min to the next platform</span></li>`;
+    const cf = find(l.from.name), ct = find(l.to.name);
     return `<li class="step"><span class="step-k">${lineBadge(l)}</span><span>
-      <span><b>${esc(l.from.name)}</b> ${checkChip(find(l.from.name))}</span>
+      <span>${stationLink(l.from.name, cf && cf.st)} ${checkChip(cf)}</span>
       <span class="fine">${l.direction ? `towards ${esc(l.direction)} · ` : ''}${l.stops} stop${l.stops === 1 ? '' : 's'} · ${l.min} min</span>
-      <span><b>${esc(l.to.name)}</b> ${checkChip(find(l.to.name))}</span></span></li>`;
+      <span>${stationLink(l.to.name, ct && ct.st)} ${checkChip(ct)}</span></span></li>`;
   }).join('');
 }
 
@@ -1280,12 +1342,13 @@ function journeyHtml(item){
   tags.push(j.stepFree ? '<span class="jt free">Step-free route</span>' : '<span class="jt stairs">May have stairs</span>');
   const lines = j.legs.filter(l => l.type === 'pt').map(lineBadge).join('<span class="j-sep" aria-hidden="true">›</span>') || '<span class="hint">Walk only</span>';
   const changes = j.transfers === 0 ? 'direct' : `${j.transfers} change${j.transfers > 1 ? 's' : ''}`;
-  const rows = checks.map(c => `<li><span class="j-role">${c.role}</span><span class="j-st">${esc(c.name)}</span>${checkChip(c)}${
-    (c.kind === 'bad' || c.kind === 'none') && c.st ? `<button type="button" class="linkbtn" data-id="${esc(c.st.id)}">See Plan B</button>` : ''}${
+  const rows = checks.map(c => `<li><span class="j-role">${c.role}</span><span class="j-st">${stationLink(c.name, c.st)}</span>${checkChip(c)}${
+    (c.kind === 'bad' || c.kind === 'none') && c.st ? `<button type="button" class="linkbtn" data-id="${esc(c.st.id)}" data-from-trip="1">See Plan B</button>` : ''}${
     c.kind === 'none' ? `<span class="j-note">${c.st ? 'expect stairs' : 'may mean stairs'}</span>` : ''}</li>`).join('');
   return `<li class="journey${item.best ? ' is-best' : ''}">
     <div class="j-tags">${tags.join('')}</div>
     <div class="j-main"><p class="j-dur tnum">${j.durMin} min</p><p class="j-times tnum">${fmtTime(j.dep)} → ${fmtTime(j.arr)} · ${changes} · ${j.walkMin} min walking</p></div>
+    <p class="j-why">${esc(item.comment)}</p>
     <div class="j-lines">${lines}</div>
     ${rows ? `<ul class="j-checks">${rows}</ul>` : ''}
     <details class="j-steps"><summary>Step by step</summary><ol>${stepsHtml(j, checks)}</ol></details>
@@ -1372,7 +1435,7 @@ async function runTrip(){
   }
   state.trip.from = from; state.trip.to = to;
   try {
-    const journeys = await findJourneys(from, to);
+    const journeys = await findJourneys(from, to, state.trip.includeBus);
     state.trip.results = journeys.length ? { from, to, journeys } : null;
     state.trip.status = journeys.length ? 'live' : 'none';
   } catch (err){
@@ -1450,8 +1513,21 @@ document.addEventListener('click', e => {
   const pick = e.target.closest('[data-pick]');
   if (pick){ pickSug(pick.getAttribute('data-pick'), +pick.getAttribute('data-idx')); return; }
   if (e.target.closest('#swap')){ swapTrip(); return; }
+  if (e.target.closest('#back-trip')){
+    state.backToTrip = false;
+    showView('trip', true);
+    renderStation();
+    const y = state.tripScroll || 0;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+    return;
+  }
   const btn = e.target.closest('[data-id]');
-  if (btn) select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
+  if (btn){
+    // Opened from a trip: remember where the trip was so "Back to your trip" can return there.
+    if (btn.hasAttribute('data-from-trip')){ state.backToTrip = true; state.tripScroll = window.scrollY || 0; }
+    else if (!btn.closest('#station')) state.backToTrip = false;
+    select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
+  }
 });
 const q = $('#q');
 q.addEventListener('input', renderResults);
@@ -1474,6 +1550,12 @@ window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel
 $('#from').addEventListener('input', () => onTripInput('from'));
 $('#to').addEventListener('input', () => onTripInput('to'));
 $('#trip-form').addEventListener('submit', e => { e.preventDefault(); runTrip(); });
+$('#bus').checked = state.trip.includeBus;
+$('#bus').addEventListener('change', e => {
+  state.trip.includeBus = e.target.checked;
+  try { localStorage.setItem(BUS_KEY, e.target.checked ? '1' : '0'); } catch (err){}
+  if (state.trip.status === 'live' || state.trip.status === 'none') runTrip();
+});
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (VIEWS.includes(h)) showView(h); });
 try { const h = location.hash.slice(1); showView(VIEWS.includes(h) ? h : 'trip'); } catch (e){ showView('trip'); }
 
