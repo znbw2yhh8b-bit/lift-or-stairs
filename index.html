@@ -80,8 +80,10 @@ button{ font:inherit; color:inherit; }
 .diag-url{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.74rem; color:var(--muted); overflow-wrap:anywhere; }
 .diag-err{ color:var(--bad); font-weight:700; font-size:.88rem; }
 .src-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
-.btn{ display:inline-flex; align-items:center; min-height:40px; box-sizing:border-box; padding:8px 14px; border-radius:999px; border:1.5px solid var(--sample-line); background:var(--surface); color:var(--ink); font-weight:700; font-size:.9rem; cursor:pointer; }
-.btn:hover{ border-color:var(--sample); }
+.btn{ display:inline-flex; align-items:center; min-height:40px; box-sizing:border-box; padding:8px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font-weight:700; font-size:.9rem; cursor:pointer; }
+.btn:hover{ border-color:var(--accent); }
+.source.sample .btn{ border-color:var(--sample-line); }
+.source.sample .btn:hover{ border-color:var(--sample); }
 .vh{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .vh:focus-visible + .btn{ outline:2.5px solid var(--focus); outline-offset:2px; }
 .pulse{ animation:pulse 1.2s ease-in-out infinite; }
@@ -92,13 +94,14 @@ button{ font:inherit; color:inherit; }
 .label{ font-size:.78rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:700; }
 .field{ position:relative; }
 .field svg{ position:absolute; left:14px; top:50%; width:20px; height:20px; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
-#q{
-  width:100%; box-sizing:border-box; min-height:52px; padding:12px 14px 12px 44px;
+.input{
+  width:100%; box-sizing:border-box; min-height:52px; padding:12px 14px;
   font:inherit; font-size:1.05rem; color:var(--ink); background:var(--surface);
   border:1.5px solid var(--line); border-radius:var(--r); appearance:none;
 }
-#q::placeholder{ color:var(--muted); }
-#q:focus{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.input::placeholder{ color:var(--muted); }
+.input:focus{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+#q{ padding-left:44px; }
 .results{ list-style:none; margin:0; padding:4px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); display:flex; flex-direction:column; }
 .hit{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; background:none; border:0; padding:11px 10px; border-radius:8px; cursor:pointer; }
 .hit:hover{ background:var(--accent-soft); }
@@ -194,6 +197,58 @@ button{ font:inherit; color:inherit; }
 .conn-form input:focus{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
 .conn-status{ font-size:.88rem; color:var(--muted); min-height:1.2em; }
 
+/* Tabs */
+.tabs{ display:flex; gap:4px; padding:4px; background:var(--unk-soft); border-radius:14px; }
+.tab{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:44px; padding:8px 4px; border:0; background:none; border-radius:10px; font-weight:700; font-size:.95rem; white-space:nowrap; color:var(--muted); cursor:pointer; }
+.tab[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent); }
+.tab-count{ min-width:1.5em; padding:0 .4em; border-radius:999px; background:var(--bad-soft); color:var(--bad); font-size:.78rem; line-height:1.55; }
+.tab-count:empty{ display:none; }
+.view{ display:flex; flex-direction:column; gap:14px; }
+
+/* Trip planner */
+.trip-form{ display:flex; flex-direction:column; gap:12px; }
+.tf{ display:flex; flex-direction:column; gap:6px; }
+.tf-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.trip-form .input{ background:var(--bg); }
+.linkbtn{ background:none; border:0; padding:4px 2px; color:var(--accent); font-weight:700; font-size:.88rem; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.btn-primary{ min-height:52px; border:0; border-radius:var(--r); background:var(--plaque); color:var(--plaque-ink); font-weight:700; font-size:1.05rem; cursor:pointer; }
+.btn-primary:hover{ filter:brightness(1.15); }
+.trip-status{ font-size:.92rem; color:var(--muted); }
+.trip-status:empty{ display:none; }
+.trip-status.is-example{ background:var(--sample-soft); border:1px solid var(--sample-line); border-radius:var(--r); padding:10px 14px; color:var(--ink); }
+.trip-status.is-error{ color:var(--bad); font-weight:700; }
+.trip-status a{ color:var(--accent); }
+.trip-status .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--unk); margin-right:6px; }
+.journeys{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.journey{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+.journey.is-best{ border-color:var(--ok); box-shadow:inset 0 0 0 1px var(--ok); }
+.j-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+.jt{ font-size:.72rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:.22em .6em; border-radius:6px; }
+.jt.best{ background:var(--ok-soft); color:var(--ok); }
+.jt.bad{ background:var(--bad-soft); color:var(--bad); }
+.jt.free{ background:var(--accent-soft); color:var(--accent); }
+.jt.stairs{ background:var(--warn-soft); color:var(--warn); }
+.j-main{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; }
+.j-dur{ font-family:var(--f-display); font-weight:700; font-size:1.9rem; line-height:1; }
+.j-times{ color:var(--muted); font-size:.92rem; }
+.j-lines{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.line{ display:inline-flex; align-items:center; min-height:26px; padding:0 .55em; border-radius:6px; background:var(--plaque); color:var(--plaque-ink); font-family:var(--f-display); font-weight:700; font-size:1rem; letter-spacing:.01em; white-space:nowrap; text-transform:none; }
+.j-sep{ color:var(--muted); }
+.j-checks{ list-style:none; margin:0; padding:12px 0 0; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:9px; }
+.j-checks li{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.j-role{ width:4.4em; flex:none; font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.j-st{ font-weight:700; min-width:0; overflow-wrap:anywhere; }
+.j-note{ font-size:.82rem; color:var(--muted); }
+.j-steps summary{ cursor:pointer; font-weight:700; color:var(--accent); font-size:.92rem; }
+.j-steps ol{ list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.step{ display:grid; grid-template-columns:4.8em 1fr; gap:10px; align-items:start; font-size:.92rem; }
+.step > span:last-child{ min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+.step-k{ font-size:.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; padding-top:3px; }
+.st-actions{ display:flex; flex-wrap:wrap; gap:8px; }
+.rowwrap{ display:flex; align-items:center; gap:4px; }
+.rowwrap .row{ flex:1; min-width:0; }
+.walk{ flex:none; padding:8px 6px; font-weight:700; font-size:.88rem; color:var(--accent); }
+
 @media (prefers-reduced-motion: reduce){ .pulse{ animation:none; } }
 </style>
 
@@ -201,16 +256,43 @@ button{ font:inherit; color:inherit; }
   <header class="top">
     <p class="eyebrow">Paris · métro · RER · tram</p>
     <h1>Lift or Stairs</h1>
-    <p class="lede">Check a station's lifts before you set off with the pram, and get a nearby Plan B when one is out.</p>
+    <p class="lede">Plan a trip with a pram: every station on the route is checked against lift status, with a Plan B when a lift is out.</p>
   </header>
 
   <div id="source" class="source" role="status"><span class="dot pulse"></span><span>Loading lift status from Île-de-France Mobilités…</span></div>
 
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button type="button" class="tab" role="tab" id="tab-trip" aria-controls="view-trip" aria-selected="true" data-view="trip">Trip</button>
+    <button type="button" class="tab" role="tab" id="tab-station" aria-controls="view-station" aria-selected="false" data-view="station">Station</button>
+    <button type="button" class="tab" role="tab" id="tab-out" aria-controls="view-out" aria-selected="false" data-view="out">Lifts out <span id="tab-out-count" class="tab-count tnum"></span></button>
+  </nav>
+
+  <div id="view-trip" class="view" role="tabpanel" aria-labelledby="tab-trip">
+    <section class="panel" aria-label="Plan a trip">
+      <form id="trip-form" class="trip-form" autocomplete="off" novalidate>
+        <div class="tf">
+          <label for="from" class="label">From</label>
+          <input id="from" class="input" type="text" autocomplete="off" spellcheck="false" enterkeyhint="next" placeholder="Station, address or place">
+          <ul id="from-sug" class="results" hidden></ul>
+        </div>
+        <div class="tf">
+          <div class="tf-head"><label for="to" class="label">To</label><button type="button" id="swap" class="linkbtn">Swap</button></div>
+          <input id="to" class="input" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Station, address or place">
+          <ul id="to-sug" class="results" hidden></ul>
+        </div>
+        <button type="submit" class="btn-primary">Find pram-friendly routes</button>
+      </form>
+    </section>
+    <div id="trip-status" class="trip-status" role="status"><span class="dot pulse"></span> Loading lift status…</div>
+    <ol id="trip-results" class="journeys"></ol>
+  </div>
+
+  <div id="view-station" class="view" role="tabpanel" aria-labelledby="tab-station" hidden>
   <section class="search" aria-label="Find a station">
     <label for="q" class="label">Station</label>
     <div class="field">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <input id="q" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="e.g. Madeleine, Gare du Nord">
+      <input id="q" class="input" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="e.g. Madeleine, Gare du Nord">
     </div>
     <ul id="results" class="results" hidden></ul>
     <div id="favs" class="favs"></div>
@@ -219,12 +301,15 @@ button{ font:inherit; color:inherit; }
   <section id="station" class="panel" aria-live="polite">
     <p class="hint">Search for a station to see its lifts.</p>
   </section>
+  </div>
 
+  <div id="view-out" class="view" role="tabpanel" aria-labelledby="tab-out" hidden>
   <section class="panel" aria-labelledby="out-h">
     <div class="sec-head"><h2 id="out-h">Out of service now</h2><span id="out-count" class="count tnum"></span></div>
     <div id="summary"></div>
     <ul id="outages" class="rows"></ul>
   </section>
+  </div>
 
   <footer class="about">
     <h2>About the data</h2>
@@ -603,7 +688,8 @@ function renderPlanB(st){
   } else {
     body = '<ul class="rows">' + opts.map(({ s, d }) => {
       const extra = s.counts.unk ? `, ${s.counts.unk} no status` : '';
-      return `<li><button type="button" class="row" data-id="${esc(s.id)}"><span class="row-main"><span class="plaque plaque-sm">${esc(s.name)}</span><span class="row-meta tnum">${fmtDist(d)} · about ${walkMin(d)} min with a pram · ${s.counts.ok} lift${s.counts.ok > 1 ? 's' : ''} working${extra}</span></span>${ICON.chev}</button></li>`;
+      const maps = `https://www.google.com/maps/dir/?api=1&destination=${s.lat.toFixed(5)},${s.lon.toFixed(5)}&travelmode=walking`;
+      return `<li class="rowwrap"><button type="button" class="row" data-id="${esc(s.id)}"><span class="row-main"><span class="plaque plaque-sm">${esc(s.name)}</span><span class="row-meta tnum">${fmtDist(d)} · about ${walkMin(d)} min with a pram · ${s.counts.ok} lift${s.counts.ok > 1 ? 's' : ''} working${extra}</span></span>${ICON.chev}</button><a class="walk" href="${maps}" target="_blank" rel="noopener">Walk there</a></li>`;
     }).join('') + '</ul>';
   }
   return `<div class="planb"><h3 class="sub-h">Plan B · nearby stations with working lifts</h3>${body}<p class="fine">Straight-line distance. Walking time assumes 4 km/h on a route about 30% longer.</p></div>`;
@@ -638,6 +724,7 @@ function renderStation(){
       <button type="button" class="save" id="save" aria-pressed="${saved}">${ICON.star}<span>${saved ? 'Saved' : 'Save'}</span></button>
     </div>
     <p class="st-meta">${meta.join('<span aria-hidden="true">·</span>')}</p>
+    <div class="st-actions"><button type="button" class="btn" data-trip="from">Trip from here</button><button type="button" class="btn" data-trip="to">Trip to here</button></div>
     <div class="verdict ${v.cls}">${v.icon}<div><p class="v-title">${v.title}</p><p class="v-sub">${v.sub}</p></div></div>
     <h3 class="sub-h">Lifts at this station</h3>
     <ul class="lifts">${lifts}</ul>
@@ -658,13 +745,26 @@ function renderOutages(){
   const list = state.stations.filter(s => s.counts.out > 0)
     .sort((a, b) => b.counts.out - a.counts.out || a.name.localeCompare(b.name, 'fr'));
   $('#out-count').textContent = list.length ? `${list.length} station${list.length > 1 ? 's' : ''}` : '';
+  $('#tab-out-count').textContent = list.length ? String(list.length) : '';
   $('#outages').innerHTML = list.length ? list.map(s => {
     const reasons = [...new Set(s.lifts.filter(l => l.status === 'out').map(l => l.reason).filter(Boolean))].join(', ');
     return `<li><button type="button" class="row" data-id="${esc(s.id)}"><span class="row-main"><span class="plaque plaque-sm">${esc(s.name)}</span><span class="row-meta"><span class="chip out tnum">${s.counts.out} of ${s.counts.n} out</span>${reasons ? `<span>${esc(reasons)}</span>` : ''}</span></span>${ICON.chev}</button></li>`;
   }).join('') : '<li class="hint">No lift was reported out of service at the last check.</li>';
 }
 
-function renderAll(){ renderSource(); renderResults(); renderFavs(); renderStation(); renderOutages(); }
+function renderAll(){ renderSource(); renderResults(); renderFavs(); renderStation(); renderOutages(); renderTrip(); }
+
+/* ---------- Views (Trip / Station / Lifts out), routed on the page hash ---------- */
+const VIEWS = ['trip', 'station', 'out'];
+function showView(v, updateHash){
+  if (!VIEWS.includes(v)) v = 'trip';
+  state.view = v;
+  for (const name of VIEWS){
+    $('#view-' + name).hidden = name !== v;
+    $('#tab-' + name).setAttribute('aria-selected', String(name === v));
+  }
+  if (updateHash){ try { if (location.hash !== '#' + v) location.hash = v; } catch (e){} }
+}
 
 /* ---------- Actions ---------- */
 function select(id, scroll){
@@ -672,6 +772,7 @@ function select(id, scroll){
   if (!st) return;
   state.selected = st;
   $('#q').value = '';
+  showView('station', true);
   renderResults(); renderFavs(); renderStation();
   if (scroll) $('#station').scrollIntoView({ behavior:reduceMotion ? 'auto' : 'smooth', block:'start' });
 }
@@ -700,7 +801,7 @@ function setData(r){
 
 /* ---------- Data layer ---------- */
 // Swap this for your own backend later (e.g. a proxy that merges PRIM data and parents' reports).
-function loadError(detail){ const e = new Error(detail); e.detail = detail; return e; }
+function loadError(detail, status){ const e = new Error(detail); e.detail = detail; e.status = status; return e; }
 
 // PRIM marketplace addresses take the key as an "apikey" header; Opendatasoft addresses take it as an apikey query parameter.
 function keyed(url, key){
@@ -727,7 +828,7 @@ async function fetchJson(url, ms){
         : 'Request blocked or server unreachable. In a normal browser this usually means the server refuses requests from other websites (CORS).');
     }
     const denied = res.status === 401 || res.status === 403;
-    if (!res.ok) throw loadError(`Server answered HTTP ${res.status}${res.status === 404 ? ' (not found: the dataset may have moved)' : denied ? (key ? ' (your API key was refused for this address)' : ' (needs an API key)') : ''}.`);
+    if (!res.ok) throw loadError(`Server answered HTTP ${res.status}${res.status === 404 ? ' (not found: the dataset may have moved)' : denied ? (key ? ' (your API key was refused for this address)' : ' (needs an API key)') : ''}.`, res.status);
     try { return await res.json(); }
     catch (e){ throw loadError('Server answered, but not with JSON data.'); }
   } finally { clearTimeout(timer); }
@@ -853,11 +954,348 @@ function wireConnection(){
   });
 }
 
+/* ---------- Trip planner: IDFM journey planner (Navitia via PRIM), each station checked against lift status ---------- */
+const NAVITIA = 'https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia';
+const PLACE_TYPES = { stop_area:'Station', stop_point:'Stop', address:'Address', poi:'Place', administrative_region:'Area' };
+const KIND_COST = { bad:100, none:60, warn:25, unk:15 };
+state.trip = { from:null, to:null, results:null, status:'example', message:'' };
+state.sug = { from:[], to:[] };
+
+function navitia(path, params){
+  const u = new URL(NAVITIA + path);
+  for (const [k, v] of params) u.searchParams.append(k, v);
+  return fetchJson(u.toString(), 15000);
+}
+
+function navPlace(p){
+  if (!p) return { name:'', lat:null, lon:null };
+  const o = p[p.embedded_type] || {};
+  const c = o.coord || (o.stop_area && o.stop_area.coord) || p.coord || null;
+  const lat = c ? parseFloat(c.lat) : NaN, lon = c ? parseFloat(c.lon) : NaN;
+  return { name:(o.stop_area && o.stop_area.name) || o.name || p.name || '', lat:isFinite(lat) ? lat : null, lon:isFinite(lon) ? lon : null };
+}
+
+async function searchPlaces(q){
+  const json = await navitia('/places', [['q', q], ['count', '6']]);
+  return ((json && json.places) || []).map(p => {
+    const pl = navPlace(p);
+    return { name:p.name || pl.name, label:PLACE_TYPES[p.embedded_type] || 'Place', id:p.id, lat:pl.lat, lon:pl.lon };
+  }).filter(p => p.id || p.lat != null);
+}
+
+function parseNavDate(s){
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(s || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+}
+
+function normJourney(j, stepFree){
+  const legs = [];
+  let walk = 0;
+  for (const s of j.sections || []){
+    const min = Math.round((s.duration || 0) / 60);
+    if (s.type === 'public_transport' || s.type === 'on_demand_transport'){
+      const di = s.display_informations || {};
+      legs.push({ type:'pt', mode:di.commercial_mode || di.physical_mode || '', code:di.code || di.label || '', color:di.color || '', text:di.text_color || '',
+        direction:di.direction || '', from:navPlace(s.from), to:navPlace(s.to), stops:Math.max(0, (s.stop_date_times || []).length - 1), min });
+    } else if (s.type === 'street_network' || s.type === 'crow_fly'){
+      if (min > 0){ walk += min; legs.push({ type:'walk', min, to:navPlace(s.to).name }); }
+    } else if (s.type === 'transfer'){
+      walk += min; legs.push({ type:'transfer', min });
+    }
+  }
+  return { dep:parseNavDate(j.departure_date_time), arr:parseNavDate(j.arrival_date_time), durMin:Math.round((j.duration || 0) / 60),
+    transfers:j.nb_transfers || 0, walkMin:walk, stepFree, legs };
+}
+
+const journeySig = j => j.legs.filter(l => l.type === 'pt').map(l => `${l.code}|${fold(l.from.name)}|${fold(l.to.name)}`).join('>') || 'walk';
+const placeRef = p => p.id || `${p.lon};${p.lat}`;
+
+// Two requests: step-free only (wheelchair=true) and unrestricted; merged, then ranked for a pram.
+async function findJourneys(from, to){
+  const base = [['from', placeRef(from)], ['to', placeRef(to)], ['count', '3']];
+  const [free, any] = await Promise.allSettled([navitia('/journeys', base.concat([['wheelchair', 'true']])), navitia('/journeys', base)]);
+  if (free.status === 'rejected' && any.status === 'rejected'){
+    const e = free.reason || any.reason;
+    if (e && e.status === 404) return [];
+    throw e;
+  }
+  const map = new Map();
+  const add = (res, stepFree) => {
+    if (res.status !== 'fulfilled') return;
+    for (const raw of (res.value && res.value.journeys) || []){
+      const j = normJourney(raw, stepFree);
+      const k = journeySig(j);
+      if (map.has(k)){ if (stepFree) map.get(k).stepFree = true; }
+      else map.set(k, j);
+    }
+  };
+  add(free, true);
+  add(any, false);
+  return [...map.values()];
+}
+
+function matchStation(p){
+  if (!p || !p.name) return null;
+  const k = fold(p.name);
+  const same = state.stations.filter(s => s.key === k);
+  if (same.length === 1) return same[0];
+  const pool = same.length ? same : state.stations;
+  if (p.lat == null) return same[0] || null;
+  let best = null, bestD = Infinity;
+  for (const s of pool){
+    if (s.lat == null) continue;
+    const d = distM(p, s);
+    if (d < bestD){ best = s; bestD = d; }
+  }
+  if (same.length) return best || same[0];
+  return bestD <= 300 ? best : null;
+}
+
+const isStreetMode = mode => /bus|tram|noctilien|navette|cable/.test(fold(mode));
+
+function checkStop(p, mode){
+  if (isStreetMode(mode)) return { kind:'street', cls:'ok', label:'Street level', st:null };
+  const st = matchStation(p);
+  if (!st) return { kind:'none', cls:'warn', label:'No lift listed', st:null };
+  const { ok, out, unk, n } = st.counts;
+  if (out > 0 && ok > 0) return { kind:'warn', cls:'warn', label:`${out} of ${n} lifts out`, st };
+  if (out > 0) return { kind:'bad', cls:'out', label:'Lift out', st };
+  if (ok > 0) return { kind:'ok', cls:'ok', label:unk ? 'Lifts working (some unconfirmed)' : 'Lifts working', st };
+  return { kind:'unk', cls:'unknown', label:'No status', st };
+}
+
+function journeyChecks(j){
+  const stops = [];
+  const pts = j.legs.filter(l => l.type === 'pt');
+  pts.forEach((l, i) => {
+    const push = (p, role) => {
+      const last = stops[stops.length - 1];
+      if (last && fold(last.p.name) === fold(p.name)){
+        last.role = 'Change';
+        if (isStreetMode(last.mode)) last.mode = l.mode;
+        return;
+      }
+      stops.push({ p, role, mode:l.mode });
+    };
+    push(l.from, i === 0 ? 'Start' : 'Change');
+    push(l.to, i === pts.length - 1 ? 'Arrive' : 'Change');
+  });
+  return stops.map(s => Object.assign({ name:s.p.name, role:s.role }, checkStop(s.p, s.mode)));
+}
+
+function rankJourneys(list){
+  const items = list.map(j => {
+    const checks = journeyChecks(j);
+    const score = checks.reduce((sum, c) => sum + (KIND_COST[c.kind] || 0), 0) + j.durMin + (j.stepFree ? 0 : 20);
+    return { j, checks, score };
+  });
+  items.sort((a, b) => a.score - b.score);
+  if (items.length && !items[0].checks.some(c => c.kind === 'bad' || c.kind === 'none')) items[0].best = true;
+  return items;
+}
+
+const fmtTime = d => d ? d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+const hexColor = c => /^[0-9a-f]{6}$/i.test(c || '') ? '#' + c : null;
+function modeShort(mode, code){
+  const f = fold(mode);
+  if (/metro/.test(f)) return 'M';
+  if (/rer/.test(f)) return 'RER';
+  if (/tram/.test(f)) return /^t/i.test(code || '') ? '' : 'T';
+  if (/bus|noctilien/.test(f)) return 'Bus';
+  if (/train|transilien/.test(f)) return 'Train';
+  return '';
+}
+function lineBadge(l){
+  const bg = hexColor(l.color), fg = hexColor(l.text) || '#FFFFFF';
+  const m = modeShort(l.mode, l.code);
+  return `<span class="line"${bg ? ` style="background:${bg};color:${fg}"` : ''}>${esc(m)}${m && l.code ? ' ' : ''}${esc(l.code)}</span>`;
+}
+const checkChip = c => c ? `<span class="chip ${c.cls}">${esc(c.label)}</span>` : '';
+
+function stepsHtml(j, checks){
+  const find = name => checks.find(c => fold(c.name) === fold(name));
+  return j.legs.map(l => {
+    if (l.type === 'walk') return `<li class="step"><span class="step-k">Walk</span><span>${l.min} min${l.to ? ` to ${esc(l.to)}` : ''}</span></li>`;
+    if (l.type === 'transfer') return `<li class="step"><span class="step-k">Change</span><span>Walk ${l.min} min to the next platform</span></li>`;
+    return `<li class="step"><span class="step-k">${lineBadge(l)}</span><span>
+      <span><b>${esc(l.from.name)}</b> ${checkChip(find(l.from.name))}</span>
+      <span class="fine">${l.direction ? `towards ${esc(l.direction)} · ` : ''}${l.stops} stop${l.stops === 1 ? '' : 's'} · ${l.min} min</span>
+      <span><b>${esc(l.to.name)}</b> ${checkChip(find(l.to.name))}</span></span></li>`;
+  }).join('');
+}
+
+function journeyHtml(item){
+  const { j, checks } = item;
+  const tags = [];
+  if (item.best) tags.push('<span class="jt best">Best with a pram</span>');
+  if (checks.some(c => c.kind === 'bad')) tags.push('<span class="jt bad">Lift out on this route</span>');
+  tags.push(j.stepFree ? '<span class="jt free">Step-free route</span>' : '<span class="jt stairs">May have stairs</span>');
+  const lines = j.legs.filter(l => l.type === 'pt').map(lineBadge).join('<span class="j-sep" aria-hidden="true">›</span>') || '<span class="hint">Walk only</span>';
+  const changes = j.transfers === 0 ? 'direct' : `${j.transfers} change${j.transfers > 1 ? 's' : ''}`;
+  const rows = checks.map(c => `<li><span class="j-role">${c.role}</span><span class="j-st">${esc(c.name)}</span>${checkChip(c)}${
+    c.kind === 'bad' && c.st ? `<button type="button" class="linkbtn" data-id="${esc(c.st.id)}">See Plan B</button>` : ''}${
+    c.kind === 'none' ? '<span class="j-note">may mean stairs</span>' : ''}</li>`).join('');
+  return `<li class="journey${item.best ? ' is-best' : ''}">
+    <div class="j-tags">${tags.join('')}</div>
+    <div class="j-main"><p class="j-dur tnum">${j.durMin} min</p><p class="j-times tnum">${fmtTime(j.dep)} → ${fmtTime(j.arr)} · ${changes} · ${j.walkMin} min walking</p></div>
+    <div class="j-lines">${lines}</div>
+    ${rows ? `<ul class="j-checks">${rows}</ul>` : ''}
+    <details class="j-steps"><summary>Step by step</summary><ol>${stepsHtml(j, checks)}</ol></details>
+  </li>`;
+}
+
+// Example trip shown until the viewer plans their own (real line colours; times relative to now).
+function exampleTrip(){
+  const now = Date.now();
+  const at = m => new Date(now + m * 60000);
+  const P = (name, lat, lon) => ({ name, lat, lon });
+  const GDN = P('Gare du Nord', 48.8809, 2.3553), CLH = P('Châtelet - Les Halles', 48.8616, 2.3468), MAD = P('Madeleine', 48.8705, 2.3253);
+  const MAG = P('Magenta', 48.8814, 2.3575), HSL = P('Haussmann Saint-Lazare', 48.8738, 2.3283);
+  return {
+    from:GDN, to:MAD,
+    journeys:[
+      { dep:at(3), arr:at(25), durMin:22, transfers:1, walkMin:6, stepFree:true, legs:[
+        { type:'pt', mode:'RER', code:'B', color:'5291CE', text:'FFFFFF', direction:'Massy - Palaiseau', from:GDN, to:CLH, stops:1, min:5 },
+        { type:'transfer', min:6 },
+        { type:'pt', mode:'Métro', code:'14', color:'62259D', text:'FFFFFF', direction:"Aéroport d'Orly", from:CLH, to:MAD, stops:2, min:4 } ] },
+      { dep:at(2), arr:at(23), durMin:21, transfers:0, walkMin:12, stepFree:true, legs:[
+        { type:'walk', min:4, to:'Magenta' },
+        { type:'pt', mode:'RER', code:'E', color:'C04191', text:'FFFFFF', direction:'Haussmann Saint-Lazare', from:MAG, to:HSL, stops:1, min:5 },
+        { type:'walk', min:8, to:'Madeleine' } ] }
+    ]
+  };
+}
+
+function renderTrip(){
+  const t = state.trip, status = $('#trip-status'), list = $('#trip-results');
+  const addKey = '<a href="#conn" class="open-conn">add your free PRIM API key</a>';
+  if (t.status === 'loading'){
+    status.className = 'trip-status';
+    status.innerHTML = '<span class="dot pulse"></span> Finding routes and checking lifts…';
+    list.innerHTML = '';
+    return;
+  }
+  if (t.status === 'error' || t.status === 'none' || t.status === 'pick'){
+    status.className = 'trip-status is-error';
+    status.innerHTML = t.status === 'none' ? 'No route found between these places. Try a nearby station or address.' : esc(t.message);
+    list.innerHTML = '';
+    return;
+  }
+  let data = t.results, example = false;
+  if (!data){ data = exampleTrip(); example = true; }
+  const msgs = [];
+  if (example){
+    msgs.push(`<strong>Example trip:</strong> ${esc(data.from.name)} → ${esc(data.to.name)}.`);
+    msgs.push(state.cfg.key ? 'Enter your own start and destination above.' : `${t.status === 'nokey' ? 'Planning your own trips uses IDFM\'s route planner, which needs a key:' : 'To plan your own trips,'} ${addKey}.`);
+  } else {
+    msgs.push(`<strong>${esc(data.from.name)} → ${esc(data.to.name)}</strong> · routes from IDFM's planner, ranked for a pram.`);
+  }
+  if (state.mode === 'sample') msgs.push('Lift checks use sample data.');
+  status.className = 'trip-status' + (example || state.mode === 'sample' ? ' is-example' : '');
+  status.innerHTML = msgs.join(' ');
+  list.innerHTML = rankJourneys(data.journeys).map(journeyHtml).join('');
+}
+
+async function resolvePlace(which){
+  const q = $('#' + which).value.trim();
+  if (!q) return null;
+  if (state.cfg.key){
+    try { const r = await searchPlaces(q); if (r[0]) return r[0]; } catch (e){}
+  }
+  const f = fold(q);
+  const s = state.stations.find(x => x.key === f) || state.stations.find(x => x.key.includes(f));
+  return s && s.lat != null ? { name:s.name, lat:s.lat, lon:s.lon } : null;
+}
+
+async function runTrip(){
+  hideSug('from'); hideSug('to');
+  if (!state.cfg.key){ state.trip.status = 'nokey'; state.trip.results = null; renderTrip(); return; }
+  state.trip.status = 'loading';
+  renderTrip();
+  const [from, to] = await Promise.all([state.trip.from || resolvePlace('from'), state.trip.to || resolvePlace('to')]);
+  if (!from || !to){
+    state.trip.status = 'pick';
+    state.trip.message = !from && !to ? 'Enter a start and a destination.' : !from ? 'Choose a start from the suggestions.' : 'Choose a destination from the suggestions.';
+    renderTrip();
+    return;
+  }
+  state.trip.from = from; state.trip.to = to;
+  try {
+    const journeys = await findJourneys(from, to);
+    state.trip.results = journeys.length ? { from, to, journeys } : null;
+    state.trip.status = journeys.length ? 'live' : 'none';
+  } catch (err){
+    state.trip.results = null;
+    state.trip.status = 'error';
+    state.trip.message = `IDFM's route planner didn't answer. ${(err && err.detail) || ''}`;
+  }
+  renderTrip();
+}
+
+let sugTimer = null;
+function hideSug(which){ const ul = $('#' + which + '-sug'); ul.hidden = true; ul.innerHTML = ''; state.sug[which] = []; }
+function onTripInput(which){
+  state.trip[which] = null;
+  const q = $('#' + which).value.trim();
+  clearTimeout(sugTimer);
+  if (q.length < 2){ hideSug(which); return; }
+  sugTimer = setTimeout(() => suggest(which, q), 250);
+}
+async function suggest(which, q){
+  let items = [];
+  if (state.cfg.key){ try { items = await searchPlaces(q); } catch (e){ items = []; } }
+  if (!items.length){
+    const f = fold(q);
+    items = state.stations.filter(s => s.key.includes(f) && s.lat != null).slice(0, 6).map(s => ({ name:s.name, label:'Station with lifts', lat:s.lat, lon:s.lon }));
+  }
+  if ($('#' + which).value.trim() !== q) return;
+  state.sug[which] = items;
+  const ul = $('#' + which + '-sug');
+  ul.hidden = false;
+  ul.innerHTML = items.length
+    ? items.map((it, i) => `<li><button type="button" class="hit" data-pick="${which}" data-idx="${i}"><span class="hit-name">${esc(it.name)}</span><span class="chip unknown">${esc(it.label)}</span></button></li>`).join('')
+    : `<li class="noresult">No match for “${esc(q)}”.</li>`;
+}
+function pickSug(which, idx){
+  const it = state.sug[which][idx];
+  if (!it) return;
+  state.trip[which] = it;
+  $('#' + which).value = it.name;
+  hideSug(which);
+  const other = which === 'from' ? 'to' : 'from';
+  if (!state.trip[other] && !$('#' + other).value.trim()) $('#' + other).focus();
+}
+function swapTrip(){
+  const a = state.trip.from;
+  state.trip.from = state.trip.to; state.trip.to = a;
+  const v = $('#from').value; $('#from').value = $('#to').value; $('#to').value = v;
+  hideSug('from'); hideSug('to');
+}
+function tripFromStation(which){
+  const st = state.selected;
+  if (!st) return;
+  state.trip[which] = st.lat != null ? { name:st.name, lat:st.lat, lon:st.lon } : null;
+  $('#' + which).value = st.name;
+  hideSug(which);
+  showView('trip', true);
+  window.scrollTo({ top:0, behavior:reduceMotion ? 'auto' : 'smooth' });
+  const other = which === 'from' ? 'to' : 'from';
+  if (state.trip[other] || $('#' + other).value.trim()) runTrip();
+  else $('#' + other).focus();
+}
+
 /* ---------- Wire up ---------- */
 document.addEventListener('click', e => {
   if (e.target.closest('#save')){ toggleSave(); return; }
   if (e.target.closest('#retry')){ retryLive(); return; }
   if (e.target.closest('.open-conn')){ $('#conn').open = true; return; }
+  const tab = e.target.closest('[data-view]');
+  if (tab){ showView(tab.getAttribute('data-view'), true); return; }
+  const trip = e.target.closest('[data-trip]');
+  if (trip){ tripFromStation(trip.getAttribute('data-trip')); return; }
+  const pick = e.target.closest('[data-pick]');
+  if (pick){ pickSug(pick.getAttribute('data-pick'), +pick.getAttribute('data-idx')); return; }
+  if (e.target.closest('#swap')){ swapTrip(); return; }
   const btn = e.target.closest('[data-id]');
   if (btn) select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
 });
@@ -877,7 +1315,13 @@ document.addEventListener('change', e => {
 });
 
 // Expose pure helpers for testing outside the page.
-window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords, keyed, loadLifts };
+window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords, keyed, loadLifts, normJourney, rankJourneys, findJourneys, exampleTrip, state };
+
+$('#from').addEventListener('input', () => onTripInput('from'));
+$('#to').addEventListener('input', () => onTripInput('to'));
+$('#trip-form').addEventListener('submit', e => { e.preventDefault(); runTrip(); });
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (VIEWS.includes(h)) showView(h); });
+try { const h = location.hash.slice(1); showView(VIEWS.includes(h) ? h : 'trip'); } catch (e){ showView('trip'); }
 
 wireConnection();
 loadLifts().then(setData);
