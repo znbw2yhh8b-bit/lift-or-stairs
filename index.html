@@ -69,8 +69,21 @@ button{ font:inherit; color:inherit; }
 .source{ display:flex; gap:10px; align-items:flex-start; font-size:.92rem; color:var(--muted); }
 .source .dot{ width:10px; height:10px; border-radius:50%; background:var(--unk); flex:none; margin-top:.4em; }
 .source .dot.ok{ background:var(--ok); }
-.source.sample{ display:flex; flex-direction:column; gap:2px; background:var(--sample-soft); color:var(--ink); border:1px solid var(--sample-line); border-radius:var(--r); padding:12px 14px; }
-.source.sample strong{ color:var(--sample); text-transform:uppercase; letter-spacing:.08em; font-size:.78rem; }
+.source.sample{ display:flex; flex-direction:column; gap:6px; background:var(--sample-soft); color:var(--ink); border:1px solid var(--sample-line); border-radius:var(--r); padding:12px 14px; }
+.source.sample > strong{ color:var(--sample); text-transform:uppercase; letter-spacing:.08em; font-size:.78rem; }
+.source.file{ align-items:flex-start; }
+.diag{ font-size:.86rem; }
+.diag summary{ cursor:pointer; font-weight:700; color:var(--sample); padding:2px 0; }
+.diag ol{ margin:8px 0; padding-left:1.25em; display:flex; flex-direction:column; gap:10px; }
+.diag p{ margin-top:4px; }
+.diag a{ color:var(--accent); }
+.diag-url{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.74rem; color:var(--muted); overflow-wrap:anywhere; }
+.diag-err{ color:var(--bad); font-weight:700; font-size:.88rem; }
+.src-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+.btn{ display:inline-flex; align-items:center; min-height:40px; box-sizing:border-box; padding:8px 14px; border-radius:999px; border:1.5px solid var(--sample-line); background:var(--surface); color:var(--ink); font-weight:700; font-size:.9rem; cursor:pointer; }
+.btn:hover{ border-color:var(--sample); }
+.vh{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.vh:focus-visible + .btn{ outline:2.5px solid var(--focus); outline-offset:2px; }
 .pulse{ animation:pulse 1.2s ease-in-out infinite; }
 @keyframes pulse{ 50%{ opacity:.3; } }
 
@@ -218,8 +231,23 @@ button{ font:inherit; color:inherit; }
 'use strict';
 
 /* ---------- Config ---------- */
-// Public IDFM open-data endpoint (Opendatasoft API v2.1). No API key needed.
-const LIVE_URL = 'https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/etat-des-ascenseurs/exports/json';
+// Public IDFM open-data endpoints (Opendatasoft). No API key needed. Tried in order; add ?src=<url> to the page address to try another one first.
+const IDFM = 'https://data.iledefrance-mobilites.fr';
+const DATASET = 'etat-des-ascenseurs';
+const TEST_URL = `${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/exports/json`;
+function liveSources(){
+  const list = [];
+  try {
+    const custom = new URLSearchParams(location.search).get('src');
+    if (custom) list.push({ label:'Custom source (?src=)', url:custom });
+  } catch (e){}
+  list.push(
+    { label:'Explore API v2.1 · full export', url:`${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/exports/json` },
+    { label:'Explore API v2.1 · records, page by page', url:`${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/records`, paged:true },
+    { label:'Records API v1', url:`${IDFM}/api/records/1.0/search/?dataset=${DATASET}&rows=10000` }
+  );
+  return list;
+}
 const STALE_HOURS = 12;             // older than this gets an "old info" tag
 const PRAM_M_PER_MIN = 4000 / 60;   // 4 km/h pushing a pram
 const DETOUR = 1.3;                 // real streets are longer than a straight line
@@ -289,12 +317,16 @@ function l93ToWgs84(X, Y){
 }
 
 function coordsOf(rec){
-  const geo = pick(rec, ['geo_point_2d', 'geopoint', 'geo_point']);
+  const geo = pick(rec, ['geo_point_2d', 'geopoint', 'geo_point', 'coordonnees', 'coordinates']);
   if (geo){
     if (Array.isArray(geo) && geo.length === 2) return { lat:+geo[0], lon:+geo[1] };
     if (typeof geo === 'object' && geo.lat != null) return { lat:+geo.lat, lon:+(geo.lon != null ? geo.lon : geo.lng) };
+    if (typeof geo === 'string' && geo.includes(',')){
+      const [a, b] = geo.split(',').map(parseFloat);
+      if (isFinite(a) && isFinite(b)) return { lat:a, lon:b };
+    }
   }
-  const x = parseFloat(pick(rec, ['ZdCXEpsg2154', 'zdcx'])), y = parseFloat(pick(rec, ['ZdCYEpsg2154', 'zdcy']));
+  const x = parseFloat(pick(rec, ['ZdCXEpsg2154', 'zdcx', 'x_l93', 'coord_x'])), y = parseFloat(pick(rec, ['ZdCYEpsg2154', 'zdcy', 'y_l93', 'coord_y']));
   if (isFinite(x) && isFinite(y) && x > 1e5 && y > 6e6) return l93ToWgs84(x, y);
   const lat = parseFloat(pick(rec, ['lat', 'latitude'])), lon = parseFloat(pick(rec, ['lon', 'lng', 'longitude']));
   if (isFinite(lat) && isFinite(lon)) return { lat, lon };
@@ -315,9 +347,9 @@ function buildStations(records){
   const map = new Map();
   for (const rec of records){
     if (!rec || typeof rec !== 'object') continue;
-    const name = pick(rec, ['ZdCName', 'zdc_name', 'nom_zdc']);
+    const name = pick(rec, ['ZdCName', 'zdc_name', 'nom_zdc', 'zdcnom', 'nom_gare', 'station', 'gare', 'stop_name']);
     if (!name) continue;
-    const id = String(pick(rec, ['ZdCId', 'zdc_id']) || fold(name));
+    const id = String(pick(rec, ['ZdCId', 'zdc_id', 'id_zdc']) || fold(name));
     let st = map.get(id);
     if (!st){
       const c = coordsOf(rec);
@@ -328,12 +360,12 @@ function buildStations(records){
       if (c){ st.lat = c.lat; st.lon = c.lon; }
     }
     st.lifts.push({
-      id: String(pick(rec, ['liftId']) || ''),
-      where: String(pick(rec, ['liftSituation']) || 'Lift'),
-      dir: String(pick(rec, ['liftDirection']) || ''),
-      status: normStatus(pick(rec, ['liftStatus', 'liftState'])),
-      reason: reasonLabel(pick(rec, ['liftReason'])),
-      updated: parseDate(pick(rec, ['liftStateUpdate']))
+      id: String(pick(rec, ['liftId', 'lift_id', 'id_ascenseur']) || ''),
+      where: String(pick(rec, ['liftSituation', 'situation', 'emplacement', 'localisation']) || 'Lift'),
+      dir: String(pick(rec, ['liftDirection', 'direction']) || ''),
+      status: normStatus(pick(rec, ['liftStatus', 'liftState', 'statut', 'etat', 'status'])),
+      reason: reasonLabel(pick(rec, ['liftReason', 'raison', 'motif', 'cause'])),
+      updated: parseDate(pick(rec, ['liftStateUpdate', 'date_maj', 'date_mise_a_jour', 'last_update', 'updated_at']))
     });
   }
   const stations = [...map.values()];
@@ -454,7 +486,7 @@ function sampleRecords(){
 /* ---------- State ---------- */
 const $ = s => document.querySelector(s);
 const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:loadFavs() };
+const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:loadFavs(), diag:[], source:'', fileError:'' };
 
 function loadFavs(){
   try { const v = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
@@ -465,14 +497,32 @@ function saveFavs(){ try { localStorage.setItem(FAV_KEY, JSON.stringify(state.fa
 /* ---------- Rendering ---------- */
 function renderSource(){
   const el = $('#source');
-  if (state.mode === 'live'){
-    const lifts = state.stations.reduce((n, s) => n + s.counts.n, 0);
+  const lifts = state.stations.reduce((n, s) => n + s.counts.n, 0);
+  const counts = `<span class="tnum">${fmtNum(state.stations.length)}</span> stations, <span class="tnum">${fmtNum(lifts)}</span> lifts`;
+  if (state.mode === 'loading'){
+    el.className = 'source';
+    el.innerHTML = '<span class="dot pulse"></span><span>Loading lift status from Île-de-France Mobilités…</span>';
+  } else if (state.mode === 'live'){
     const time = state.loadedAt.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
     el.className = 'source live';
-    el.innerHTML = `<span class="dot ok"></span><span><strong>Live official data</strong> · loaded at <span class="tnum">${time}</span> · <span class="tnum">${fmtNum(state.stations.length)}</span> stations, <span class="tnum">${fmtNum(lifts)}</span> lifts</span>`;
-  } else if (state.mode === 'sample'){
+    el.innerHTML = `<span class="dot ok"></span><span><strong>Live official data</strong> · loaded at <span class="tnum">${time}</span> · ${counts}</span>`;
+  } else if (state.mode === 'file'){
+    el.className = 'source file';
+    el.innerHTML = `<span class="dot ok"></span><span><strong>Real IDFM data from your file</strong> · ${esc(state.source)} · ${counts}. It won't update by itself; load a fresh export to refresh.</span>`;
+  } else {
     el.className = 'source sample';
-    el.innerHTML = `<strong>Sample data</strong><span>This preview can't reach the IDFM feed, so the statuses below are made up to show how the app works. Hosted on any website, the same page loads the live feed.</span>`;
+    const steps = state.diag.map(d => `<li><b>${esc(d.label)}</b><br><span class="diag-url">${esc(d.url)}</span><br>${esc(d.detail)}</li>`).join('');
+    el.innerHTML = `<strong>Sample data</strong>
+      <span>The live IDFM feed didn't load, so the statuses below are made up to show how the app works.</span>
+      <details class="diag"><summary>Why didn't the live feed load?</summary>
+        <ol>${steps}</ol>
+        <p>To test the feed itself, open <a href="${TEST_URL}" target="_blank" rel="noopener">the IDFM export link</a>. If it shows data, IDFM is refusing requests from other websites, and the file option below or a small proxy server gets around it.</p>
+      </details>
+      ${state.fileError ? `<p class="diag-err">${esc(state.fileError)}</p>` : ''}
+      <div class="src-actions">
+        <button type="button" id="retry" class="btn">Try live again</button>
+        <input id="file" type="file" class="vh" accept=".json,.geojson,.csv,application/json,text/csv"><label for="file" class="btn">Load an IDFM export file</label>
+      </div>`;
   }
 }
 
@@ -600,42 +650,136 @@ function toggleSave(){
   saveFavs(); renderFavs(); renderStation();
 }
 
-function setData(stations, mode){
-  state.stations = stations;
-  state.mode = mode;
+function setData(r){
+  const prev = state.selected ? state.selected.name : null;
+  state.stations = r.stations;
+  state.mode = r.mode;
+  state.diag = r.diag || [];
+  state.source = r.source || '';
   state.loadedAt = new Date();
-  const fav = state.favs.map(n => stations.find(s => s.name === n)).find(Boolean);
-  // Open on a saved station, otherwise on the station with the most lifts out, so the first view shows Plan B at work.
-  state.selected = fav || [...stations].sort((a, b) => b.counts.out - a.counts.out || b.counts.n - a.counts.n || a.name.localeCompare(b.name, 'fr'))[0] || null;
+  const find = n => r.stations.find(s => s.name === n);
+  const fav = state.favs.map(find).find(Boolean);
+  // Keep the open station, else a saved one, else the one with the most lifts out, so the first view shows Plan B at work.
+  state.selected = (prev && find(prev)) || fav || [...r.stations].sort((a, b) => b.counts.out - a.counts.out || b.counts.n - a.counts.n || a.name.localeCompare(b.name, 'fr'))[0] || null;
   renderAll();
 }
 
-// Data layer: one function to swap for your own backend later (e.g. a proxy that merges PRIM data and crowd reports).
-async function loadLifts(){
+/* ---------- Data layer ---------- */
+// Swap this for your own backend later (e.g. a proxy that merges PRIM data and parents' reports).
+function loadError(detail){ const e = new Error(detail); e.detail = detail; return e; }
+
+async function fetchJson(url, ms){
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 9000);
+  const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(LIVE_URL, { signal:ctrl.signal, headers:{ Accept:'application/json' } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    const recs = Array.isArray(json) ? json
-      : Array.isArray(json.results) ? json.results
-      : Array.isArray(json.records) ? json.records.map(r => (r.record && r.record.fields) || r.fields || r)
-      : [];
-    const stations = buildStations(recs);
-    if (!stations.length) throw new Error('No stations in response');
-    return { stations, mode:'live' };
-  } catch (err){
-    return { stations:buildStations(sampleRecords()), mode:'sample' };
-  } finally {
-    clearTimeout(timer);
+    let res;
+    try { res = await fetch(url, { signal:ctrl.signal }); }
+    catch (e){
+      throw loadError(e && e.name === 'AbortError'
+        ? `No answer after ${ms / 1000} s.`
+        : 'Request blocked or server unreachable. In a normal browser this usually means the server refuses requests from other websites (CORS).');
+    }
+    if (!res.ok) throw loadError(`Server answered HTTP ${res.status}${res.status === 404 ? ' (not found: the dataset may have moved)' : res.status === 401 || res.status === 403 ? ' (needs a login or API key)' : ''}.`);
+    try { return await res.json(); }
+    catch (e){ throw loadError('Server answered, but not with JSON data.'); }
+  } finally { clearTimeout(timer); }
+}
+
+function extractRecords(json){
+  if (Array.isArray(json)) return json;
+  if (!json || typeof json !== 'object') return [];
+  if (Array.isArray(json.results)) return json.results;
+  if (Array.isArray(json.records)) return json.records.map(r => (r.record && r.record.fields) || r.fields || r);
+  if (Array.isArray(json.features)) return json.features.map(f => {
+    const c = f.geometry && Array.isArray(f.geometry.coordinates) ? f.geometry.coordinates : null;
+    return Object.assign({}, f.properties, c ? { geo_point_2d:{ lon:c[0], lat:c[1] } } : {});
+  });
+  return [];
+}
+
+async function fetchPaged(url){
+  const all = [];
+  for (let offset = 0; offset < 10000; offset += 100){
+    const json = await fetchJson(`${url}?limit=100&offset=${offset}`, 10000);
+    const recs = extractRecords(json);
+    all.push(...recs);
+    const total = json && typeof json.total_count === 'number' ? json.total_count : null;
+    if (recs.length < 100 || (total != null && all.length >= total)) break;
   }
+  return all;
+}
+
+async function loadLifts(){
+  const diag = [];
+  for (const src of liveSources()){
+    try {
+      const recs = src.paged ? await fetchPaged(src.url) : extractRecords(await fetchJson(src.url, 15000));
+      if (!recs.length){ diag.push({ label:src.label, url:src.url, detail:'Server answered, but with no lift records.' }); continue; }
+      const stations = buildStations(recs);
+      if (!stations.length){
+        diag.push({ label:src.label, url:src.url, detail:`Got ${recs.length} records but couldn't find station names in them. Fields seen: ${Object.keys(recs[0] || {}).slice(0, 16).join(', ')}.` });
+        continue;
+      }
+      return { stations, mode:'live', source:src.label, diag };
+    } catch (err){
+      diag.push({ label:src.label, url:src.url, detail:(err && err.detail) || String((err && err.message) || err) });
+    }
+  }
+  return { stations:buildStations(sampleRecords()), mode:'sample', diag };
+}
+
+function parseCsv(text){
+  const nl = text.indexOf('\n');
+  const first = nl > -1 ? text.slice(0, nl) : text;
+  const delim = first.split(';').length > first.split(',').length ? ';' : ',';
+  const rows = [];
+  let row = [], field = '', quoted = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (quoted){
+      if (c === '"'){ if (text[i + 1] === '"'){ field += '"'; i++; } else quoted = false; }
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === delim){ row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field !== '' || row.length){ row.push(field); rows.push(row); }
+  const head = (rows.shift() || []).map(h => h.replace(/^﻿/, '').trim());
+  return rows.filter(r => r.length > 1).map(r => Object.fromEntries(head.map((h, i) => [h, r[i]])));
+}
+
+async function loadFile(file){
+  let recs = [];
+  try {
+    const text = (await file.text()).trim();
+    recs = (text.startsWith('[') || text.startsWith('{')) ? extractRecords(JSON.parse(text)) : parseCsv(text);
+  } catch (e){ recs = []; }
+  const stations = recs.length ? buildStations(recs) : [];
+  if (!stations.length){
+    state.fileError = recs.length
+      ? `“${file.name}” has ${recs.length} rows but no station names the app recognises.`
+      : `Couldn't read “${file.name}”. Use the JSON or CSV export of the État des ascenseurs dataset.`;
+    renderSource();
+    return;
+  }
+  state.fileError = '';
+  setData({ stations, mode:'file', source:file.name, diag:state.diag });
+}
+
+function retryLive(){
+  state.fileError = '';
+  state.mode = 'loading';
+  renderSource();
+  loadLifts().then(setData);
 }
 
 /* ---------- Wire up ---------- */
 document.addEventListener('click', e => {
-  const save = e.target.closest('#save');
-  if (save){ toggleSave(); return; }
+  if (e.target.closest('#save')){ toggleSave(); return; }
+  if (e.target.closest('#retry')){ retryLive(); return; }
   const btn = e.target.closest('[data-id]');
   if (btn) select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
 });
@@ -650,10 +794,14 @@ q.addEventListener('keydown', e => {
   }
 });
 
-// Expose pure helpers for testing outside the page.
-if (typeof window !== 'undefined') window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords };
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'file' && e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+});
 
-loadLifts().then(({ stations, mode }) => setData(stations, mode));
+// Expose pure helpers for testing outside the page.
+window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords };
+
+loadLifts().then(setData);
 })();
 </script>
 
