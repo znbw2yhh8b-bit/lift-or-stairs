@@ -217,6 +217,7 @@ button{ font:inherit; color:inherit; }
 .trip-status:empty{ display:none; }
 .trip-status.is-example{ background:var(--sample-soft); border:1px solid var(--sample-line); border-radius:var(--r); padding:10px 14px; color:var(--ink); }
 .trip-status.is-error{ color:var(--bad); font-weight:700; }
+.key-help{ display:block; margin-top:6px; color:var(--ink); font-weight:400; }
 .trip-status a{ color:var(--accent); }
 .trip-status .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--unk); margin-right:6px; }
 .journeys{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
@@ -314,7 +315,8 @@ button{ font:inherit; color:inherit; }
   <footer class="about">
     <h2>About the data</h2>
     <p>Lift status comes from the Île-de-France Mobilités open dataset <a href="https://data.iledefrance-mobilites.fr/explore/dataset/etat-des-ascenseurs/" target="_blank" rel="noopener">État des ascenseurs</a>. Station staff check lifts on their rounds and the feed updates about three times a day, so a lift can break after the last check.</p>
-    <p>The feed only lists stations that IDFM counts as accessible. If a station isn't here, expect stairs. Metro line 14 has lifts at every station.</p>
+    <p>The full station list, with the lines at each station, comes from IDFM's dataset <a href="https://prim.iledefrance-mobilites.fr/en/jeux-de-donnees/emplacement-des-gares-idf" target="_blank" rel="noopener">Gares et stations du réseau ferré</a>. A station with no lift in the feed is marked “No lift”: expect stairs there. Metro line 14 has lifts at every station.</p>
+    <p>Routes come from IDFM's journey planner on PRIM. Line colours in the station view are approximate.</p>
     <p>Prototype. Always follow station signage and staff on the day.</p>
     <details id="conn" class="conn">
       <summary>Connect to IDFM with your API key</summary>
@@ -322,6 +324,8 @@ button{ font:inherit; color:inherit; }
         <p>IDFM's lift feed refuses requests without an API key. Create a free account on <a href="https://prim.iledefrance-mobilites.fr/" target="_blank" rel="noopener">PRIM</a>, copy your API key from your account page, and paste it here. It is saved only in this browser.</p>
         <label for="k" class="label">PRIM API key</label>
         <input id="k" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key">
+        <label for="k2" class="label">Route planner key (only if different)</label>
+        <input id="k2" type="password" autocomplete="off" spellcheck="false" placeholder="Leave empty to use the same key">
         <label for="u" class="label">Data address (optional)</label>
         <input id="u" type="url" autocomplete="off" spellcheck="false" placeholder="API link from the dataset's PRIM page">
         <p class="fine">Leave the address empty to use IDFM's standard one. If PRIM's <a href="https://prim.iledefrance-mobilites.fr/en/jeux-de-donnees/etat-des-ascenseurs" target="_blank" rel="noopener">État des ascenseurs page</a> shows a different API link, paste it here.</p>
@@ -437,8 +441,11 @@ function coordsOf(rec){
       if (isFinite(a) && isFinite(b)) return { lat:a, lon:b };
     }
   }
-  const x = parseFloat(pick(rec, ['ZdCXEpsg2154', 'zdcx', 'x_l93', 'coord_x'])), y = parseFloat(pick(rec, ['ZdCYEpsg2154', 'zdcy', 'y_l93', 'coord_y']));
-  if (isFinite(x) && isFinite(y) && x > 1e5 && y > 6e6) return l93ToWgs84(x, y);
+  const x = parseFloat(pick(rec, ['ZdCXEpsg2154', 'zdcx', 'x_l93', 'coord_x', 'x'])), y = parseFloat(pick(rec, ['ZdCYEpsg2154', 'zdcy', 'y_l93', 'coord_y', 'y']));
+  if (isFinite(x) && isFinite(y)){
+    if (x > 1e5 && y > 6e6) return l93ToWgs84(x, y);
+    if (Math.abs(x) <= 180 && y > 40 && y <= 90) return { lat:y, lon:x };
+  }
   const lat = parseFloat(pick(rec, ['lat', 'latitude'])), lon = parseFloat(pick(rec, ['lon', 'lng', 'longitude']));
   if (isFinite(lat) && isFinite(lon)) return { lat, lon };
   return null;
@@ -479,7 +486,10 @@ function buildStations(records){
       updated: parseDate(pick(rec, ['liftStateUpdate', 'date_maj', 'date_mise_a_jour', 'last_update', 'updated_at']))
     });
   }
-  const stations = [...map.values()];
+  return finalizeStations([...map.values()]);
+}
+
+function finalizeStations(stations){
   for (const st of stations){
     const c = { ok:0, out:0, unknown:0 };
     let last = null;
@@ -490,14 +500,115 @@ function buildStations(records){
     st.counts = { ok:c.ok, out:c.out, unk:c.unknown, n:st.lifts.length };
     st.last = last;
     st.key = fold(st.name);
+    st.altKeys = st.altKeys || [];
+    st.lines = st.lines || [];
+    st.tramOnly = !!st.tramOnly;
     st.lifts.sort((a, b) => liftRank(a) - liftRank(b));
   }
   stations.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   return stations;
 }
 
+/* ---------- All rail stations (with or without lifts) ---------- */
+// IDFM dataset "Gares et stations du réseau ferré d'Île-de-France (par ligne)": one row per station per line.
+const RAIL_DATASET = 'emplacement-des-gares-idf';
+const LINE_COLORS = {
+  'M1':['FFCD00','000000'], 'M2':['003CA6','FFFFFF'], 'M3':['837902','FFFFFF'], 'M3bis':['6EC4E8','000000'], 'M4':['CF009E','FFFFFF'],
+  'M5':['FF7E2E','000000'], 'M6':['6ECA97','000000'], 'M7':['FA9ABA','000000'], 'M7bis':['6ECA97','000000'], 'M8':['E19BDF','000000'],
+  'M9':['B6BD00','000000'], 'M10':['C9910D','000000'], 'M11':['704B1C','FFFFFF'], 'M12':['007852','FFFFFF'], 'M13':['6EC4E8','000000'],
+  'M14':['62259D','FFFFFF'], 'RER A':['EB2132','FFFFFF'], 'RER B':['5091CB','FFFFFF'], 'RER C':['FFCE00','000000'], 'RER D':['00814F','FFFFFF'], 'RER E':['C04191','FFFFFF']
+};
+const KIND_ORDER = { metro:0, rer:1, train:2, tram:3, val:4, cable:5, navette:6, '':7 };
+const lineOrder = (a, b) => (KIND_ORDER[a.kind] - KIND_ORDER[b.kind]) || a.code.localeCompare(b.code, 'fr', { numeric:true });
+
+function railLine(rec){
+  const m = fold(pick(rec, ['mode', 'mode_transport', 'transportmode']) || '');
+  let kind = /metro/.test(m) ? 'metro' : /rer/.test(m) ? 'rer' : /tram/.test(m) ? 'tram' : /train|transilien/.test(m) ? 'train'
+    : /val/.test(m) ? 'val' : /cable/.test(m) ? 'cable' : /navette/.test(m) ? 'navette' : '';
+  if (!kind){
+    if (+pick(rec, ['metro'])) kind = 'metro'; else if (+pick(rec, ['rer'])) kind = 'rer';
+    else if (+pick(rec, ['tramway'])) kind = 'tram'; else if (+pick(rec, ['train'])) kind = 'train';
+  }
+  let code = String(pick(rec, ['indice_lig', 'ligne_code', 'ligne', 'res_com']) || '').trim();
+  code = code.replace(/^(m[eé]tro|rer|train|tramway|tram|ligne)\s+/i, '');
+  if (!code && !kind) return null;
+  const mode = { metro:'Métro', rer:'RER', tram:'Tramway', train:'Train', val:'VAL', cable:'Câble', navette:'Navette' }[kind] || '';
+  const short = modeShort(mode, code);
+  const col = LINE_COLORS[(short === 'M' ? 'M' : short === 'RER' ? 'RER ' : '') + code];
+  return { kind, mode, code, label:(short ? short + ' ' : '') + code, color:col ? col[0] : '', text:col ? col[1] : '' };
+}
+
+function buildRail(records){
+  const groups = [];
+  for (const rec of records){
+    if (!rec || typeof rec !== 'object') continue;
+    const name = pick(rec, ['nom_gare', 'nomlong', 'nom_long', 'nom']);
+    const c = coordsOf(rec);
+    if (!name || !c) continue;
+    const k = fold(name);
+    let g = groups.find(x => x.key === k && distM(x, c) < 800);
+    if (!g){ g = { key:k, name:String(name), lat:c.lat, lon:c.lon, lines:[] }; groups.push(g); }
+    const line = railLine(rec);
+    if (line && !g.lines.some(l => l.label === line.label)) g.lines.push(line);
+  }
+  for (const g of groups){
+    g.lines.sort(lineOrder);
+    g.tramOnly = g.lines.length > 0 && g.lines.every(l => l.kind === 'tram');
+  }
+  return groups;
+}
+
+// Attach each lift station to the rail station with the same name nearby (or the closest one within 250 m).
+function mergeStations(liftStations, rail){
+  if (!rail.length) return liftStations;
+  const out = rail.map(r => ({ id:`R:${r.key}:${r.lat.toFixed(4)}`, name:r.name, lat:r.lat, lon:r.lon, lines:r.lines.slice(), tramOnly:r.tramOnly, lifts:[], altKeys:[] }));
+  for (const ls of liftStations){
+    let best = null, bestScore = Infinity;
+    if (ls.lat != null){
+      for (const r of out){
+        const d = distM(ls, r);
+        const same = fold(r.name) === ls.key;
+        if ((same && d < 800) || d < 250){
+          const score = same ? d / 10 : d;
+          if (score < bestScore){ best = r; bestScore = score; }
+        }
+      }
+    } else {
+      best = out.find(r => fold(r.name) === ls.key) || null;
+    }
+    if (best){
+      best.lifts.push(...ls.lifts);
+      if (fold(best.name) !== ls.key && !best.altKeys.includes(ls.key)) best.altKeys.push(ls.key);
+    } else {
+      out.push({ id:ls.id, name:ls.name, lat:ls.lat, lon:ls.lon, lines:[], tramOnly:false, lifts:ls.lifts.slice(), altKeys:[] });
+    }
+  }
+  return finalizeStations(out);
+}
+
+function sampleRailRecords(){
+  const R = [
+    ['Madeleine', 48.8705, 2.3253, 'METRO', ['8', '12', '14']], ['Saint-Lazare', 48.8754, 2.3254, 'METRO', ['3', '12', '13', '14']],
+    ['Pyramides', 48.8657, 2.3343, 'METRO', ['7', '14']], ['Châtelet - Les Halles', 48.8616, 2.3468, 'RER', ['A', 'B', 'D']],
+    ['Gare de Lyon', 48.8443, 2.3740, 'METRO', ['1', '14']], ['Gare de Lyon', 48.8443, 2.3740, 'RER', ['A', 'D']],
+    ['Gare du Nord', 48.8809, 2.3553, 'METRO', ['4', '5']], ['Gare du Nord', 48.8809, 2.3553, 'RER', ['B', 'D']],
+    ['Magenta', 48.8814, 2.3575, 'RER', ['E']], ['Haussmann Saint-Lazare', 48.8738, 2.3283, 'RER', ['E']], ['Auber', 48.8721, 2.3299, 'RER', ['A']],
+    ['Opéra', 48.8712, 2.3316, 'METRO', ['3', '7', '8']], ['Concorde', 48.8656, 2.3212, 'METRO', ['1', '8', '12']],
+    ['Saint-Augustin', 48.8746, 2.3209, 'METRO', ['9']], ['Bercy', 48.8402, 2.3794, 'METRO', ['6', '14']],
+    ['Nation', 48.8483, 2.3959, 'METRO', ['1', '2', '6', '9']], ['Nation', 48.8483, 2.3959, 'RER', ['A']]
+  ];
+  const recs = [];
+  for (const [nom, lat, lon, mode, lines] of R) for (const l of lines) recs.push({ nom_gare:nom, mode, indice_lig:l, geo_point_2d:{ lat, lon } });
+  return recs;
+}
+
 function verdict(st){
   const { ok, out, unk, n } = st.counts;
+  if (n === 0){
+    if (st.tramOnly) return { cls:'ok', dot:'ok', icon:ICON.check, title:'Street-level tram stop', sub:'Tram stops are at street level, so no lift is needed.' };
+    return { cls:'bad', dot:'bad', icon:ICON.x, title:'No lift at this station',
+      sub:'IDFM lists no lift here, so expect stairs between the street and the platform. Plan B shows the nearest stations with working lifts.' };
+  }
   if (out > 0 && ok > 0) return { cls:'warn', dot:'warn', icon:ICON.alert, title:'Some lifts out',
     sub:`${out} of ${n} lifts out of service. Check whether it's the one you need, or use Plan B.` };
   if (out > 0) return { cls:'bad', dot:'bad', icon:ICON.x, title:'No working lift',
@@ -511,7 +622,8 @@ function verdict(st){
 }
 
 function shortStatus(st){
-  const { ok, out, unk } = st.counts;
+  const { ok, out, unk, n } = st.counts;
+  if (n === 0) return st.tramOnly ? { cls:'ok', text:'Street level' } : { cls:'warn', text:'No lift' };
   if (out > 0) return ok > 0 ? { cls:'warn', text:`${out} out` } : { cls:'out', text:'Out' };
   if (ok > 0) return { cls:'ok', text: unk ? 'Working' : 'All working' };
   return { cls:'unknown', text:'No status' };
@@ -602,8 +714,9 @@ const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:
 function loadCfg(){
   try {
     const v = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
-    return { key:typeof v.key === 'string' ? v.key : '', url:typeof v.url === 'string' ? v.url : '' };
-  } catch (e){ return { key:'', url:'' }; }
+    const s = x => typeof x === 'string' ? x : '';
+    return { key:s(v.key), navKey:s(v.navKey), url:s(v.url) };
+  } catch (e){ return { key:'', navKey:'', url:'' }; }
 }
 function saveCfg(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(state.cfg)); } catch (e){} }
 
@@ -617,7 +730,9 @@ function saveFavs(){ try { localStorage.setItem(FAV_KEY, JSON.stringify(state.fa
 function renderSource(){
   const el = $('#source');
   const lifts = state.stations.reduce((n, s) => n + s.counts.n, 0);
-  const counts = `<span class="tnum">${fmtNum(state.stations.length)}</span> stations, <span class="tnum">${fmtNum(lifts)}</span> lifts`;
+  const withLifts = state.stations.filter(s => s.counts.n > 0).length;
+  const railNote = state.railOk === null ? ' · loading stations without lifts…' : state.railOk ? '' : ' · stations without lifts couldn\'t be loaded';
+  const counts = `<span class="tnum">${fmtNum(state.stations.length)}</span> stations (<span class="tnum">${fmtNum(withLifts)}</span> with lifts), <span class="tnum">${fmtNum(lifts)}</span> lifts${railNote}`;
   if (state.mode === 'loading'){
     el.className = 'source';
     el.innerHTML = '<span class="dot pulse"></span><span>Loading lift status from Île-de-France Mobilités…</span>';
@@ -651,12 +766,14 @@ function renderResults(){
   const ul = $('#results');
   if (!q){ ul.hidden = true; ul.innerHTML = ''; return; }
   const hits = state.stations
-    .filter(s => s.key.includes(q))
+    .filter(s => s.key.includes(q) || s.altKeys.some(k => k.includes(q)))
     .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || a.name.localeCompare(b.name, 'fr'))
     .slice(0, 8);
   ul.hidden = false;
   if (!hits.length){
-    ul.innerHTML = `<li class="noresult">No lifts listed for “${esc(input.trim())}”. Stations without lifts aren't in the feed, so expect stairs there.</li>`;
+    ul.innerHTML = state.railOk
+      ? `<li class="noresult">No station matches “${esc(input.trim())}”.</li>`
+      : `<li class="noresult">No lifts listed for “${esc(input.trim())}”. If that station has no lift, it isn't in the lift feed: expect stairs there.</li>`;
     return;
   }
   ul.innerHTML = hits.map(s => {
@@ -714,20 +831,23 @@ function renderStation(){
       <p class="lift-meta tnum">${bits.join(' · ')}${isStale(l.updated) ? ' <span class="tag">old info</span>' : ''}</p>
     </li>`;
   }).join('');
-  const meta = [`<span class="tnum">${st.counts.n} lift${st.counts.n > 1 ? 's' : ''}</span>`];
+  const meta = [st.counts.n ? `<span class="tnum">${st.counts.n} lift${st.counts.n > 1 ? 's' : ''}</span>` : '<span>No lifts</span>'];
   if (st.last) meta.push(`<span>last official check ${ago(st.last)}</span>`);
   if (state.mode === 'sample') meta.push('<span class="tag sample">Sample</span>');
-  const showPlanB = st.counts.out > 0 || st.counts.ok === 0;
+  const showPlanB = (st.counts.out > 0 || st.counts.ok === 0) && !(st.counts.n === 0 && st.tramOnly);
+  const lines = st.lines.length ? `<div class="j-lines" aria-label="Lines at this station">${st.lines.map(lineBadge).join('')}</div>` : '';
+  const liftList = st.counts.n ? `<ul class="lifts">${lifts}</ul>` : '<p class="hint">IDFM lists no lifts at this station.</p>';
   el.innerHTML = `
     <div class="st-head">
       <h2 class="plaque plaque-lg">${esc(st.name)}</h2>
       <button type="button" class="save" id="save" aria-pressed="${saved}">${ICON.star}<span>${saved ? 'Saved' : 'Save'}</span></button>
     </div>
+    ${lines}
     <p class="st-meta">${meta.join('<span aria-hidden="true">·</span>')}</p>
     <div class="st-actions"><button type="button" class="btn" data-trip="from">Trip from here</button><button type="button" class="btn" data-trip="to">Trip to here</button></div>
     <div class="verdict ${v.cls}">${v.icon}<div><p class="v-title">${v.title}</p><p class="v-sub">${v.sub}</p></div></div>
     <h3 class="sub-h">Lifts at this station</h3>
-    <ul class="lifts">${lifts}</ul>
+    ${liftList}
     ${showPlanB ? renderPlanB(st) : ''}`;
 }
 
@@ -791,6 +911,7 @@ function setData(r){
   state.mode = r.mode;
   state.diag = r.diag || [];
   state.source = r.source || '';
+  state.railOk = r.railOk === undefined ? false : r.railOk;
   state.loadedAt = new Date();
   const find = n => r.stations.find(s => s.name === n);
   const fav = state.favs.map(find).find(Boolean);
@@ -814,8 +935,8 @@ function keyed(url, key){
   } catch (e){ return { url, headers:{} }; }
 }
 
-async function fetchJson(url, ms){
-  const key = state.cfg.key;
+async function fetchJson(url, ms, keyOverride){
+  const key = keyOverride !== undefined ? keyOverride : state.cfg.key;
   const req = keyed(url, key);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
@@ -872,12 +993,37 @@ async function loadLifts(){
         diag.push({ label:src.label, url:src.url, detail:`Got ${recs.length} records but couldn't find station names in them. Fields seen: ${Object.keys(recs[0] || {}).slice(0, 16).join(', ')}.` });
         continue;
       }
-      return { stations, mode:'live', source:src.label, diag };
+      return { stations, mode:'live', source:src.label, diag, railOk:null };
     } catch (err){
       diag.push({ label:src.label, url:src.url, detail:(err && err.detail) || String((err && err.message) || err) });
     }
   }
-  return { stations:buildStations(sampleRecords()), mode:'sample', diag };
+  return { stations:mergeStations(buildStations(sampleRecords()), buildRail(sampleRailRecords())), mode:'sample', diag, railOk:true };
+}
+
+async function loadRail(){
+  const base = `${IDFM}/api/explore/v2.1/catalog/datasets/${RAIL_DATASET}`;
+  for (const src of [{ url:base + '/exports/json' }, { url:base + '/records', paged:true }]){
+    try {
+      const recs = src.paged ? await fetchPaged(src.url) : extractRecords(await fetchJson(src.url, 20000));
+      const rail = buildRail(recs);
+      if (rail.length) return rail;
+    } catch (e){}
+  }
+  return [];
+}
+
+// Lifts first so the page is usable quickly, then every other station merged in.
+function loadAll(){
+  return loadLifts().then(r => {
+    setData(r);
+    if (r.mode !== 'live') return r;
+    return loadRail().then(rail => {
+      if (rail.length) setData(Object.assign({}, r, { stations:mergeStations(r.stations, rail), railOk:true }));
+      else { state.railOk = false; renderSource(); }
+      return r;
+    });
+  });
 }
 
 function parseCsv(text){
@@ -925,8 +1071,7 @@ function retryLive(){
   state.fileError = '';
   state.mode = 'loading';
   renderSource();
-  loadLifts().then(r => {
-    setData(r);
+  loadAll().then(r => {
     const msg = $('#conn-status');
     if (msg) msg.textContent = r.mode === 'live'
       ? 'Connected. Live data loaded.'
@@ -936,19 +1081,21 @@ function retryLive(){
 
 function wireConnection(){
   $('#k').value = state.cfg.key;
+  $('#k2').value = state.cfg.navKey;
   $('#u').value = state.cfg.url;
   $('#conn-form').addEventListener('submit', e => {
     e.preventDefault();
-    state.cfg = { key:$('#k').value.trim(), url:$('#u').value.trim() };
+    state.cfg = { key:$('#k').value.trim(), navKey:$('#k2').value.trim(), url:$('#u').value.trim() };
+    state.trip.status = state.trip.status === 'error' ? 'example' : state.trip.status;
     saveCfg();
     $('#conn-status').textContent = 'Saved in this browser. Loading…';
     retryLive();
     window.scrollTo({ top:0, behavior:reduceMotion ? 'auto' : 'smooth' });
   });
   $('#forget').addEventListener('click', () => {
-    state.cfg = { key:'', url:'' };
+    state.cfg = { key:'', navKey:'', url:'' };
     saveCfg();
-    $('#k').value = ''; $('#u').value = '';
+    $('#k').value = ''; $('#k2').value = ''; $('#u').value = '';
     $('#conn-status').textContent = 'Key removed from this browser.';
     retryLive();
   });
@@ -964,7 +1111,7 @@ state.sug = { from:[], to:[] };
 function navitia(path, params){
   const u = new URL(NAVITIA + path);
   for (const [k, v] of params) u.searchParams.append(k, v);
-  return fetchJson(u.toString(), 15000);
+  return fetchJson(u.toString(), 15000, state.cfg.navKey || state.cfg.key);
 }
 
 function navPlace(p){
@@ -1037,7 +1184,7 @@ async function findJourneys(from, to){
 function matchStation(p){
   if (!p || !p.name) return null;
   const k = fold(p.name);
-  const same = state.stations.filter(s => s.key === k);
+  const same = state.stations.filter(s => s.key === k || s.altKeys.includes(k));
   if (same.length === 1) return same[0];
   const pool = same.length ? same : state.stations;
   if (p.lat == null) return same[0] || null;
@@ -1058,6 +1205,7 @@ function checkStop(p, mode){
   const st = matchStation(p);
   if (!st) return { kind:'none', cls:'warn', label:'No lift listed', st:null };
   const { ok, out, unk, n } = st.counts;
+  if (n === 0) return st.tramOnly ? { kind:'street', cls:'ok', label:'Street level', st } : { kind:'none', cls:'warn', label:'No lift', st };
   if (out > 0 && ok > 0) return { kind:'warn', cls:'warn', label:`${out} of ${n} lifts out`, st };
   if (out > 0) return { kind:'bad', cls:'out', label:'Lift out', st };
   if (ok > 0) return { kind:'ok', cls:'ok', label:unk ? 'Lifts working (some unconfirmed)' : 'Lifts working', st };
@@ -1133,8 +1281,8 @@ function journeyHtml(item){
   const lines = j.legs.filter(l => l.type === 'pt').map(lineBadge).join('<span class="j-sep" aria-hidden="true">›</span>') || '<span class="hint">Walk only</span>';
   const changes = j.transfers === 0 ? 'direct' : `${j.transfers} change${j.transfers > 1 ? 's' : ''}`;
   const rows = checks.map(c => `<li><span class="j-role">${c.role}</span><span class="j-st">${esc(c.name)}</span>${checkChip(c)}${
-    c.kind === 'bad' && c.st ? `<button type="button" class="linkbtn" data-id="${esc(c.st.id)}">See Plan B</button>` : ''}${
-    c.kind === 'none' ? '<span class="j-note">may mean stairs</span>' : ''}</li>`).join('');
+    (c.kind === 'bad' || c.kind === 'none') && c.st ? `<button type="button" class="linkbtn" data-id="${esc(c.st.id)}">See Plan B</button>` : ''}${
+    c.kind === 'none' ? `<span class="j-note">${c.st ? 'expect stairs' : 'may mean stairs'}</span>` : ''}</li>`).join('');
   return `<li class="journey${item.best ? ' is-best' : ''}">
     <div class="j-tags">${tags.join('')}</div>
     <div class="j-main"><p class="j-dur tnum">${j.durMin} min</p><p class="j-times tnum">${fmtTime(j.dep)} → ${fmtTime(j.arr)} · ${changes} · ${j.walkMin} min walking</p></div>
@@ -1177,7 +1325,10 @@ function renderTrip(){
   }
   if (t.status === 'error' || t.status === 'none' || t.status === 'pick'){
     status.className = 'trip-status is-error';
-    status.innerHTML = t.status === 'none' ? 'No route found between these places. Try a nearby station or address.' : esc(t.message);
+    status.innerHTML = t.status === 'none' ? 'No route found between these places. Try a nearby station or address.'
+      : esc(t.message) + (t.status === 'error' && t.keyHelp
+        ? ` <span class="key-help">The route planner is a separate API on PRIM. Log in, open the API “Calculateur Île-de-France Mobilités – Accès générique”, and make sure your account has access to it. If PRIM gives you a separate token for it, paste it as the <a href="#conn" class="open-conn">route planner key</a>.</span>`
+        : '');
     list.innerHTML = '';
     return;
   }
@@ -1227,7 +1378,10 @@ async function runTrip(){
   } catch (err){
     state.trip.results = null;
     state.trip.status = 'error';
-    state.trip.message = `IDFM's route planner didn't answer. ${(err && err.detail) || ''}`;
+    state.trip.keyHelp = !!err && (err.status === 401 || err.status === 403);
+    state.trip.message = state.trip.keyHelp
+      ? `IDFM's route planner refused your key (HTTP ${err.status}).`
+      : `IDFM's route planner didn't answer. ${(err && err.detail) || ''}`;
   }
   renderTrip();
 }
@@ -1315,7 +1469,7 @@ document.addEventListener('change', e => {
 });
 
 // Expose pure helpers for testing outside the page.
-window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords, keyed, loadLifts, normJourney, rankJourneys, findJourneys, exampleTrip, state };
+window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords, keyed, loadLifts, normJourney, rankJourneys, findJourneys, exampleTrip, state, buildRail, mergeStations, sampleRailRecords };
 
 $('#from').addEventListener('input', () => onTripInput('from'));
 $('#to').addEventListener('input', () => onTripInput('to'));
@@ -1324,7 +1478,7 @@ window.addEventListener('hashchange', () => { const h = location.hash.slice(1); 
 try { const h = location.hash.slice(1); showView(VIEWS.includes(h) ? h : 'trip'); } catch (e){ showView('trip'); }
 
 wireConnection();
-loadLifts().then(setData);
+loadAll();
 })();
 </script>
 
