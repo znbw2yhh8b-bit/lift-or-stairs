@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Lift or Stairs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column. The enamel station plaque is the single bold element; everything else stays plain and legible. */
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#131B2D; --muted:#566074; --line:#D9DEE7;
+  --plaque:#1A2955; --plaque-ink:#FFFFFF; --plaque-rim:#C8D1E6;
+  --accent:#1A2955; --accent-soft:#E4E9F5; --focus:#3D6BE0;
+  --ok:#137A3A; --ok-soft:#E1F2E7; --warn:#9A5800; --warn-soft:#FCEFD9;
+  --bad:#BD2A20; --bad-soft:#FBE4E1; --unk:#566074; --unk-soft:#E9ECF1;
+  --sample:#6E4600; --sample-soft:#FFF3D1; --sample-line:#E9C770;
+  --f-display:"Barlow Semi Condensed","Arial Narrow","Helvetica Neue",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1320; --surface:#161D2D; --ink:#E7EAF1; --muted:#9AA4B9; --line:#2A3347;
+    --plaque:#22356F; --plaque-ink:#FFFFFF; --plaque-rim:#93A3CB;
+    --accent:#A9BCF3; --accent-soft:#1F2A47; --focus:#8FA9F5;
+    --ok:#62CF8B; --ok-soft:#14301F; --warn:#F0B35A; --warn-soft:#3A2A0F;
+    --bad:#FF8F85; --bad-soft:#3D1A17; --unk:#A3ACBF; --unk-soft:#232B3C;
+    --sample:#F5D27A; --sample-soft:#2E250E; --sample-line:#6B5520;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1320; --surface:#161D2D; --ink:#E7EAF1; --muted:#9AA4B9; --line:#2A3347;
+  --plaque:#22356F; --plaque-ink:#FFFFFF; --plaque-rim:#93A3CB;
+  --accent:#A9BCF3; --accent-soft:#1F2A47; --focus:#8FA9F5;
+  --ok:#62CF8B; --ok-soft:#14301F; --warn:#F0B35A; --warn-soft:#3A2A0F;
+  --bad:#FF8F85; --bad-soft:#3D1A17; --unk:#A3ACBF; --unk-soft:#232B3C;
+  --sample:#F5D27A; --sample-soft:#2E250E; --sample-line:#6B5520;
+  color-scheme:dark;
+}
+
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:var(--f-body); font-size:16px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:20px 48px;
+}
+.wrap{ max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:18px; }
+[hidden]{ display:none !important; }
+p{ margin:0; }
+h1,h2,h3{ margin:0; text-wrap:balance; }
+button{ font:inherit; color:inherit; }
+:focus-visible{ outline:2.5px solid var(--focus); outline-offset:2px; border-radius:6px; }
+.tnum{ font-variant-numeric:tabular-nums; }
+
+/* Header */
+.top{ display:flex; flex-direction:column; gap:4px; }
+.eyebrow{ font-size:.78rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.top h1{ font-family:var(--f-display); font-weight:700; font-size:2.4rem; line-height:1.05; letter-spacing:-.005em; }
+.lede{ color:var(--muted); max-width:46ch; }
+
+/* Data source line */
+.source{ display:flex; gap:10px; align-items:flex-start; font-size:.92rem; color:var(--muted); }
+.source .dot{ width:10px; height:10px; border-radius:50%; background:var(--unk); flex:none; margin-top:.4em; }
+.source .dot.ok{ background:var(--ok); }
+.source.sample{ display:flex; flex-direction:column; gap:2px; background:var(--sample-soft); color:var(--ink); border:1px solid var(--sample-line); border-radius:var(--r); padding:12px 14px; }
+.source.sample strong{ color:var(--sample); text-transform:uppercase; letter-spacing:.08em; font-size:.78rem; }
+.pulse{ animation:pulse 1.2s ease-in-out infinite; }
+@keyframes pulse{ 50%{ opacity:.3; } }
+
+/* Search */
+.search{ display:flex; flex-direction:column; gap:8px; }
+.label{ font-size:.78rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.field{ position:relative; }
+.field svg{ position:absolute; left:14px; top:50%; width:20px; height:20px; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+#q{
+  width:100%; box-sizing:border-box; min-height:52px; padding:12px 14px 12px 44px;
+  font:inherit; font-size:1.05rem; color:var(--ink); background:var(--surface);
+  border:1.5px solid var(--line); border-radius:var(--r); appearance:none;
+}
+#q::placeholder{ color:var(--muted); }
+#q:focus{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.results{ list-style:none; margin:0; padding:4px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); display:flex; flex-direction:column; }
+.hit{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; background:none; border:0; padding:11px 10px; border-radius:8px; cursor:pointer; }
+.hit:hover{ background:var(--accent-soft); }
+.hit-name{ font-weight:700; min-width:0; overflow-wrap:anywhere; }
+.noresult{ padding:12px 10px; color:var(--muted); }
+
+.favs{ display:flex; flex-direction:column; gap:6px; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.fav{ display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border:1.5px solid var(--line); background:var(--surface); border-radius:999px; cursor:pointer; font-weight:700; font-size:.92rem; }
+.fav:hover{ border-color:var(--accent); }
+.fav.is-current{ border-color:var(--accent); background:var(--accent-soft); }
+.sdot{ width:9px; height:9px; border-radius:50%; flex:none; background:var(--unk); }
+.sdot.ok{ background:var(--ok); } .sdot.warn{ background:var(--warn); } .sdot.bad{ background:var(--bad); }
+.hint{ color:var(--muted); font-size:.92rem; }
+
+/* Panels */
+.panel{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+.sec-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.sec-head h2, .about h2{ font-family:var(--f-display); font-weight:700; font-size:1.4rem; }
+.count{ color:var(--muted); font-size:.9rem; }
+.sub-h{ font-size:.78rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+
+/* Enamel station plaque */
+.plaque{
+  display:inline-block; max-width:100%; box-sizing:border-box; overflow-wrap:anywhere;
+  font-family:var(--f-display); font-weight:600; line-height:1.15; letter-spacing:.01em;
+  background:var(--plaque); color:var(--plaque-ink);
+  border-radius:7px; padding:.3em .75em .34em;
+  box-shadow:inset 0 0 0 2px var(--plaque), inset 0 0 0 3.5px var(--plaque-rim);
+}
+.plaque-lg{ font-size:clamp(1.5rem, 6.4vw, 2.05rem); border-radius:9px; padding:.3em .7em .36em; }
+.plaque-sm{ font-size:1.05rem; }
+
+.st-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.st-meta{ color:var(--muted); font-size:.9rem; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin-top:-4px; }
+.save{ display:inline-flex; align-items:center; gap:6px; flex:none; padding:8px 12px; min-height:40px; border:1.5px solid var(--line); background:var(--surface); border-radius:999px; cursor:pointer; font-weight:700; font-size:.9rem; }
+.save svg{ width:18px; height:18px; }
+.save[aria-pressed="true"]{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); --star-fill:currentColor; }
+
+.verdict{ display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-radius:var(--r); }
+.verdict svg{ width:30px; height:30px; flex:none; }
+.verdict.ok{ background:var(--ok-soft); color:var(--ok); }
+.verdict.warn{ background:var(--warn-soft); color:var(--warn); }
+.verdict.bad{ background:var(--bad-soft); color:var(--bad); }
+.verdict.unk{ background:var(--unk-soft); color:var(--unk); }
+.v-title{ font-weight:700; font-size:1.18rem; line-height:1.25; }
+.v-sub{ color:var(--ink); margin-top:2px; }
+
+.lifts{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.lift{ display:flex; flex-direction:column; gap:2px; padding:12px 0; border-top:1px solid var(--line); }
+.lift:first-child{ border-top:0; padding-top:4px; }
+.lift-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.lift-where{ font-weight:700; min-width:0; overflow-wrap:anywhere; }
+.lift-dir{ color:var(--muted); font-size:.92rem; }
+.lift-meta{ color:var(--muted); font-size:.85rem; }
+
+.chip{ display:inline-block; font-size:.78rem; font-weight:700; padding:.18em .62em; border-radius:999px; white-space:nowrap; flex:none; }
+.chip.ok{ background:var(--ok-soft); color:var(--ok); }
+.chip.out{ background:var(--bad-soft); color:var(--bad); }
+.chip.unknown{ background:var(--unk-soft); color:var(--unk); }
+.chip.warn{ background:var(--warn-soft); color:var(--warn); }
+.tag{ display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:.1em .5em; border-radius:5px; background:var(--warn-soft); color:var(--warn); }
+.tag.sample{ background:var(--sample-soft); color:var(--sample); border:1px solid var(--sample-line); }
+
+.planb{ display:flex; flex-direction:column; gap:8px; padding-top:14px; border-top:1px dashed var(--line); }
+.fine{ color:var(--muted); font-size:.8rem; }
+
+.rows{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.rows > li + li{ border-top:1px solid var(--line); }
+.row{ width:100%; display:flex; align-items:center; gap:10px; text-align:left; background:none; border:0; padding:12px 6px; border-radius:10px; cursor:pointer; }
+.row:hover{ background:var(--accent-soft); }
+.row > svg{ width:20px; height:20px; flex:none; color:var(--muted); }
+.row-main{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+.row-meta{ color:var(--muted); font-size:.9rem; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
+
+.bar{ display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--unk-soft); }
+.seg.ok{ background:var(--ok); } .seg.out{ background:var(--bad); min-width:3px; } .seg.unknown{ background:var(--unk); }
+.seg.out.zero{ min-width:0; }
+.legend{ display:flex; flex-wrap:wrap; gap:4px 16px; font-size:.88rem; color:var(--muted); }
+.legend span{ display:inline-flex; align-items:center; gap:6px; }
+.sw{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+.sw.ok{ background:var(--ok); } .sw.out{ background:var(--bad); } .sw.unknown{ background:var(--unk); }
+
+.about{ display:flex; flex-direction:column; gap:8px; color:var(--muted); font-size:.9rem; max-width:62ch; padding-top:6px; }
+.about h2{ color:var(--ink); font-size:1.15rem; }
+.about a{ color:var(--accent); }
+
+@media (prefers-reduced-motion: reduce){ .pulse{ animation:none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Paris · métro · RER · tram</p>
+    <h1>Lift or Stairs</h1>
+    <p class="lede">Check a station's lifts before you set off with the pram, and get a nearby Plan B when one is out.</p>
+  </header>
+
+  <div id="source" class="source" role="status"><span class="dot pulse"></span><span>Loading lift status from Île-de-France Mobilités…</span></div>
+
+  <section class="search" aria-label="Find a station">
+    <label for="q" class="label">Station</label>
+    <div class="field">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="e.g. Madeleine, Gare du Nord">
+    </div>
+    <ul id="results" class="results" hidden></ul>
+    <div id="favs" class="favs"></div>
+  </section>
+
+  <section id="station" class="panel" aria-live="polite">
+    <p class="hint">Search for a station to see its lifts.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="out-h">
+    <div class="sec-head"><h2 id="out-h">Out of service now</h2><span id="out-count" class="count tnum"></span></div>
+    <div id="summary"></div>
+    <ul id="outages" class="rows"></ul>
+  </section>
+
+  <footer class="about">
+    <h2>About the data</h2>
+    <p>Lift status comes from the Île-de-France Mobilités open dataset <a href="https://data.iledefrance-mobilites.fr/explore/dataset/etat-des-ascenseurs/" target="_blank" rel="noopener">État des ascenseurs</a>. Station staff check lifts on their rounds and the feed updates about three times a day, so a lift can break after the last check.</p>
+    <p>The feed only lists stations that IDFM counts as accessible. If a station isn't here, expect stairs. Metro line 14 has lifts at every station.</p>
+    <p>Prototype. Always follow station signage and staff on the day.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Config ---------- */
+// Public IDFM open-data endpoint (Opendatasoft API v2.1). No API key needed.
+const LIVE_URL = 'https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/etat-des-ascenseurs/exports/json';
+const STALE_HOURS = 12;             // older than this gets an "old info" tag
+const PRAM_M_PER_MIN = 4000 / 60;   // 4 km/h pushing a pram
+const DETOUR = 1.3;                 // real streets are longer than a straight line
+const PLAN_B_RADIUS_M = 2000;
+const FAV_KEY = 'lift-or-stairs:favs';
+
+const ICON = {
+  check:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor" opacity=".18"/><path d="M7.2 12.4l3.1 3.1L16.9 9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor" opacity=".18"/><path d="M12 6.8v7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.4" fill="currentColor"/></svg>',
+  x:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor" opacity=".18"/><path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  q:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor" opacity=".18"/><path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-.7.3-1 .8-1 1.5v.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.3" fill="currentColor"/></svg>',
+  star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="var(--star-fill, none)" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const STATUS_LABEL = { ok:'Working', out:'Out of service', unknown:'No status' };
+
+/* ---------- Pure helpers ---------- */
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fold(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[-'’‐–—.]/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+// Field names follow IDFM's documentation (liftStatus, ZdCName…); matching is case-insensitive with fallbacks in case the schema shifts.
+function pick(rec, names){
+  for (const n of names){
+    const want = n.toLowerCase();
+    for (const k in rec){
+      if (k.toLowerCase() === want){
+        const v = rec[k];
+        if (v !== null && v !== undefined && v !== '') return v;
+      }
+    }
+  }
+  return null;
+}
+
+function normStatus(v){
+  const s = fold(v);
+  if (!s) return 'unknown';
+  if (/unknown|information|non disponible|inconnu/.test(s)) return 'unknown';
+  if (/notavailable|not available|hors|indisponible/.test(s)) return 'out';
+  if (/available|disponible|en service/.test(s)) return 'ok';
+  return 'unknown';
+}
+
+function reasonLabel(v){
+  const s = fold(v);
+  if (!s) return '';
+  if (/failure|technique/.test(s)) return 'Technical fault';
+  if (/maintenance|travaux/.test(s)) return 'Works or maintenance';
+  if (/undefined|autre/.test(s)) return 'Other problem';
+  return String(v);
+}
+
+// Lambert-93 (EPSG:2154) to WGS84, the projection IDFM uses for ZdCXEpsg2154 / ZdCYEpsg2154.
+function l93ToWgs84(X, Y){
+  const n = 0.7256077650532670, C = 11754255.4261, Xs = 700000, Ys = 12655612.0499;
+  const e = 0.0818191910428158, lon0 = 3 * Math.PI / 180;
+  const dx = X - Xs, dy = Y - Ys;
+  const R = Math.hypot(dx, dy);
+  const lon = lon0 + Math.atan2(dx, -dy) / n;
+  const L = -Math.log(R / C) / n;
+  let p = 2 * Math.atan(Math.exp(L)) - Math.PI / 2;
+  for (let i = 0; i < 8; i++){
+    const es = e * Math.sin(p);
+    p = 2 * Math.atan(Math.pow((1 + es) / (1 - es), e / 2) * Math.exp(L)) - Math.PI / 2;
+  }
+  return { lat: p * 180 / Math.PI, lon: lon * 180 / Math.PI };
+}
+
+function coordsOf(rec){
+  const geo = pick(rec, ['geo_point_2d', 'geopoint', 'geo_point']);
+  if (geo){
+    if (Array.isArray(geo) && geo.length === 2) return { lat:+geo[0], lon:+geo[1] };
+    if (typeof geo === 'object' && geo.lat != null) return { lat:+geo.lat, lon:+(geo.lon != null ? geo.lon : geo.lng) };
+  }
+  const x = parseFloat(pick(rec, ['ZdCXEpsg2154', 'zdcx'])), y = parseFloat(pick(rec, ['ZdCYEpsg2154', 'zdcy']));
+  if (isFinite(x) && isFinite(y) && x > 1e5 && y > 6e6) return l93ToWgs84(x, y);
+  const lat = parseFloat(pick(rec, ['lat', 'latitude'])), lon = parseFloat(pick(rec, ['lon', 'lng', 'longitude']));
+  if (isFinite(lat) && isFinite(lon)) return { lat, lon };
+  return null;
+}
+
+function parseDate(v){
+  if (!v) return null;
+  let s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d/.test(s)) s = s.replace(' ', 'T');
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+const liftRank = l => l.status === 'out' ? 0 : l.status === 'unknown' ? 1 : 2;
+
+function buildStations(records){
+  const map = new Map();
+  for (const rec of records){
+    if (!rec || typeof rec !== 'object') continue;
+    const name = pick(rec, ['ZdCName', 'zdc_name', 'nom_zdc']);
+    if (!name) continue;
+    const id = String(pick(rec, ['ZdCId', 'zdc_id']) || fold(name));
+    let st = map.get(id);
+    if (!st){
+      const c = coordsOf(rec);
+      st = { id, name:String(name), lat:c ? c.lat : null, lon:c ? c.lon : null, lifts:[] };
+      map.set(id, st);
+    } else if (st.lat == null){
+      const c = coordsOf(rec);
+      if (c){ st.lat = c.lat; st.lon = c.lon; }
+    }
+    st.lifts.push({
+      id: String(pick(rec, ['liftId']) || ''),
+      where: String(pick(rec, ['liftSituation']) || 'Lift'),
+      dir: String(pick(rec, ['liftDirection']) || ''),
+      status: normStatus(pick(rec, ['liftStatus', 'liftState'])),
+      reason: reasonLabel(pick(rec, ['liftReason'])),
+      updated: parseDate(pick(rec, ['liftStateUpdate']))
+    });
+  }
+  const stations = [...map.values()];
+  for (const st of stations){
+    const c = { ok:0, out:0, unknown:0 };
+    let last = null;
+    for (const l of st.lifts){
+      c[l.status]++;
+      if (l.updated && (!last || l.updated > last)) last = l.updated;
+    }
+    st.counts = { ok:c.ok, out:c.out, unk:c.unknown, n:st.lifts.length };
+    st.last = last;
+    st.key = fold(st.name);
+    st.lifts.sort((a, b) => liftRank(a) - liftRank(b));
+  }
+  stations.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  return stations;
+}
+
+function verdict(st){
+  const { ok, out, unk, n } = st.counts;
+  if (out > 0 && ok > 0) return { cls:'warn', dot:'warn', icon:ICON.alert, title:'Some lifts out',
+    sub:`${out} of ${n} lifts out of service. Check whether it's the one you need, or use Plan B.` };
+  if (out > 0) return { cls:'bad', dot:'bad', icon:ICON.x, title:'No working lift',
+    sub: n === 1 ? 'The only lift here is out of service.' : `All ${n} lifts are out of service.` };
+  if (unk > 0 && ok > 0) return { cls:'ok', dot:'ok', icon:ICON.check, title:'Lifts working',
+    sub:`${ok} working at the last check, ${unk} with no status.` };
+  if (unk > 0) return { cls:'unk', dot:'', icon:ICON.q, title:'No status right now',
+    sub:'The last check gave no status. Ask station staff, or pick a station from Plan B.' };
+  return { cls:'ok', dot:'ok', icon:ICON.check, title:'All lifts working',
+    sub: n === 1 ? 'The lift was working at the last check.' : `All ${n} lifts were working at the last check.` };
+}
+
+function shortStatus(st){
+  const { ok, out, unk } = st.counts;
+  if (out > 0) return ok > 0 ? { cls:'warn', text:`${out} out` } : { cls:'out', text:'Out' };
+  if (ok > 0) return { cls:'ok', text: unk ? 'Working' : 'All working' };
+  return { cls:'unknown', text:'No status' };
+}
+
+function distM(a, b){
+  const R = 6371000, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const walkMin = d => Math.max(1, Math.round(d * DETOUR / PRAM_M_PER_MIN));
+const fmtDist = d => d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
+const fmtNum = n => n.toLocaleString('en-GB');
+
+function planB(st, stations){
+  if (st.lat == null) return null;
+  return stations
+    .filter(s => s !== st && s.lat != null && s.counts.out === 0 && s.counts.ok > 0)
+    .map(s => ({ s, d:distM(st, s) }))
+    .filter(x => x.d <= PLAN_B_RADIUS_M)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 3);
+}
+
+function ago(d){
+  const m = Math.round((Date.now() - d.getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 36) return `${h} h ago`;
+  return `${Math.round(h / 24)} days ago`;
+}
+const isStale = d => !!d && (Date.now() - d.getTime()) > STALE_HOURS * 3600000;
+
+/* ---------- Sample data (used only when the live feed can't be reached) ---------- */
+// Real station names and approximate positions; every status is made up.
+function sampleRecords(){
+  const now = Date.now();
+  const t = m => new Date(now - m * 60000).toISOString();
+  const A = 'Disponible', O = 'Hors-service', U = 'Information non disponible';
+  const two = (m, s) => [["Accès rue ↔ salle des billets", 'Toutes directions', s || A, '', m], ['Salle des billets ↔ quais', 'Toutes directions', s || A, '', m]];
+  const S = [
+    ['S01', 'Madeleine', 650509, 6863597, [["Accès boulevard Malesherbes ↔ salle d'échanges", 'Toutes directions', O, 'closedForMaintenance', 150], ["Salle d'échanges ↔ quai ligne 14", "Direction Aéroport d'Orly", O, 'closedForMaintenance', 150]]],
+    ['S02', 'Saint-Lazare', 650521, 6864142, [["Accès rue Saint-Lazare ↔ salle d'échanges", 'Toutes directions', 'available', '', 95], ["Salle d'échanges ↔ quai ligne 14", 'Direction Saint-Denis Pleyel', 'available', '', 95], ["Salle d'échanges ↔ quai ligne 14", "Direction Aéroport d'Orly", 'available', '', 95]]],
+    ['S03', 'Pyramides', 651164, 6863058, [["Accès avenue de l'Opéra ↔ salle des billets", 'Toutes directions', A, '', 95], ['Salle des billets ↔ quais ligne 14', 'Toutes directions', A, '', 95]]],
+    ['S04', 'Châtelet - Les Halles', 652077, 6862594, [["Salle d'échanges ↔ quais RER B et D", 'Toutes directions', 'notavailable', 'liftFailure', 40], ["Accès Forum des Halles ↔ salle d'échanges", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ quais RER A", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ quai ligne 14", 'Toutes directions', A, '', 95]]],
+    ['S05', 'Gare de Lyon', 654058, 6860655, [["Accès boulevard Diderot ↔ salle d'échanges", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ quais RER A", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ quai ligne 14", 'Toutes directions', A, '', 95], ['Hall 1 ↔ quais RER D', 'Toutes directions', U, '', 95]]],
+    ['S06', 'Bercy', 654450, 6860196, two(95)],
+    ['S07', 'Cour Saint-Émilion', 654973, 6859435, two(95)],
+    ['S08', 'Bibliothèque François Mitterrand', 654206, 6859041, two(95)],
+    ['S09', 'Olympiades', 653529, 6858735, two(95)],
+    ['S10', 'Gare du Nord', 652719, 6864735, [["Salle d'échanges ↔ quais RER B et D", 'Toutes directions', O, 'liftFailure', 210], ["Accès rue de Dunkerque ↔ salle d'échanges", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ couloir Magenta", 'Toutes directions', A, '', 95]]],
+    ['S11', 'Magenta', 652880, 6864790, two(95)],
+    ['S12', 'Haussmann Saint-Lazare', 650732, 6863962, two(95)],
+    ['S13', 'Auber', 650847, 6863772, [["Accès rue Auber ↔ salle d'échanges", 'Toutes directions', A, '', 95], ["Salle d'échanges ↔ quais RER A", 'Direction Marne-la-Vallée', A, '', 95], ["Salle d'échanges ↔ quais RER A", 'Direction Saint-Germain-en-Laye', U, '', 95]]],
+    ['S14', 'Charles de Gaulle - Étoile', 648289, 6863984, two(95)],
+    ['S15', 'La Défense', 644128, 6866035, two(95)],
+    ['S16', 'Nation', 655668, 6861087, [['Accès place de la Nation ↔ salle des billets', 'Toutes directions', O, 'undefinedEquipmentProblem', 70], ['Salle des billets ↔ quais RER A', 'Toutes directions', A, '', 95]]],
+    ['S17', "Gare d'Austerlitz", 653395, 6860449, two(95)],
+    ['S18', 'Porte de Clichy', 649666, 6866285, two(95, 'available')],
+    ['S19', 'Pont Cardinet', 649807, 6865605, two(95, 'available')],
+    ['S20', 'Saint-Ouen', 650299, 6867380, two(95)],
+    ['S21', 'Mairie de Saint-Ouen', 651186, 6868207, two(95)],
+    ['S22', 'Luxembourg', 651550, 6860886, [['Accès boulevard Saint-Michel ↔ quais', 'Toutes directions', U, '', 95]]],
+    ['S23', 'Invalides', 649707, 6862548, two(95)],
+    ['S24', 'Saint-Michel Notre-Dame', 651901, 6861695, [['Accès quai Saint-Michel ↔ salle des billets', 'Toutes directions', O, 'liftFailure', 55], ['Salle des billets ↔ quais RER C', 'Toutes directions', O, 'closedForMaintenance', 900]]],
+    ['S25', "Musée d'Orsay", 650550, 6862429, two(95)],
+    ['S26', 'Port-Royal', 651338, 6860221, two(95)],
+    ['S27', 'Maison Blanche', 652908, 6858207, two(95)]
+  ];
+  const recs = [];
+  let i = 0;
+  for (const [zid, name, x, y, lifts] of S){
+    for (const [sit, dir, status, why, m] of lifts){
+      recs.push({ liftId:'SAMPLE-' + (++i), liftStateUpdate:t(m), liftSituation:sit, liftDirection:dir,
+        liftStatus:status, liftReason:why, ZdCId:'SAMPLE:' + zid, ZdCName:name, ZdCXEpsg2154:x, ZdCYEpsg2154:y });
+    }
+  }
+  return recs;
+}
+
+/* ---------- State ---------- */
+const $ = s => document.querySelector(s);
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:loadFavs() };
+
+function loadFavs(){
+  try { const v = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
+  catch (e){ return []; }
+}
+function saveFavs(){ try { localStorage.setItem(FAV_KEY, JSON.stringify(state.favs)); } catch (e){} }
+
+/* ---------- Rendering ---------- */
+function renderSource(){
+  const el = $('#source');
+  if (state.mode === 'live'){
+    const lifts = state.stations.reduce((n, s) => n + s.counts.n, 0);
+    const time = state.loadedAt.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+    el.className = 'source live';
+    el.innerHTML = `<span class="dot ok"></span><span><strong>Live official data</strong> · loaded at <span class="tnum">${time}</span> · <span class="tnum">${fmtNum(state.stations.length)}</span> stations, <span class="tnum">${fmtNum(lifts)}</span> lifts</span>`;
+  } else if (state.mode === 'sample'){
+    el.className = 'source sample';
+    el.innerHTML = `<strong>Sample data</strong><span>This preview can't reach the IDFM feed, so the statuses below are made up to show how the app works. Hosted on any website, the same page loads the live feed.</span>`;
+  }
+}
+
+function renderResults(){
+  const input = $('#q').value;
+  const q = fold(input);
+  const ul = $('#results');
+  if (!q){ ul.hidden = true; ul.innerHTML = ''; return; }
+  const hits = state.stations
+    .filter(s => s.key.includes(q))
+    .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || a.name.localeCompare(b.name, 'fr'))
+    .slice(0, 8);
+  ul.hidden = false;
+  if (!hits.length){
+    ul.innerHTML = `<li class="noresult">No lifts listed for “${esc(input.trim())}”. Stations without lifts aren't in the feed, so expect stairs there.</li>`;
+    return;
+  }
+  ul.innerHTML = hits.map(s => {
+    const st = shortStatus(s);
+    return `<li><button type="button" class="hit" data-id="${esc(s.id)}"><span class="hit-name">${esc(s.name)}</span><span class="chip ${st.cls}">${st.text}</span></button></li>`;
+  }).join('');
+}
+
+function renderFavs(){
+  const el = $('#favs');
+  const list = state.favs.map(n => state.stations.find(s => s.name === n)).filter(Boolean);
+  if (!list.length){
+    el.innerHTML = state.mode === 'loading' ? '' : '<p class="hint">Save the stations you use most and they will show here with their status.</p>';
+    return;
+  }
+  el.innerHTML = '<p class="label">My stations</p><div class="chips">' + list.map(s => {
+    const v = verdict(s);
+    return `<button type="button" class="fav${s === state.selected ? ' is-current' : ''}" data-id="${esc(s.id)}"><span class="sdot ${v.dot}"></span>${esc(s.name)}</button>`;
+  }).join('') + '</div>';
+}
+
+function renderPlanB(st){
+  const opts = planB(st, state.stations);
+  let body;
+  if (opts === null){
+    body = '<p class="hint">This station has no location in the feed, so nearby options can\'t be worked out.</p>';
+  } else if (!opts.length){
+    body = '<p class="hint">No station within 2 km has its lifts confirmed working. A bus or tram may be easier for this trip.</p>';
+  } else {
+    body = '<ul class="rows">' + opts.map(({ s, d }) => {
+      const extra = s.counts.unk ? `, ${s.counts.unk} no status` : '';
+      return `<li><button type="button" class="row" data-id="${esc(s.id)}"><span class="row-main"><span class="plaque plaque-sm">${esc(s.name)}</span><span class="row-meta tnum">${fmtDist(d)} · about ${walkMin(d)} min with a pram · ${s.counts.ok} lift${s.counts.ok > 1 ? 's' : ''} working${extra}</span></span>${ICON.chev}</button></li>`;
+    }).join('') + '</ul>';
+  }
+  return `<div class="planb"><h3 class="sub-h">Plan B · nearby stations with working lifts</h3>${body}<p class="fine">Straight-line distance. Walking time assumes 4 km/h on a route about 30% longer.</p></div>`;
+}
+
+function renderStation(){
+  const el = $('#station');
+  const st = state.selected;
+  if (!st){
+    el.innerHTML = state.mode === 'loading' ? '<p class="hint">Loading stations…</p>' : '<p class="hint">Search for a station to see its lifts.</p>';
+    return;
+  }
+  const v = verdict(st);
+  const saved = state.favs.includes(st.name);
+  const lifts = st.lifts.map(l => {
+    const bits = [];
+    if (l.status === 'out' && l.reason) bits.push(esc(l.reason));
+    bits.push(l.updated ? `checked ${ago(l.updated)}` : 'check time not given');
+    return `<li class="lift">
+      <div class="lift-top"><p class="lift-where">${esc(l.where)}</p><span class="chip ${l.status}">${STATUS_LABEL[l.status]}</span></div>
+      ${l.dir ? `<p class="lift-dir">${esc(l.dir)}</p>` : ''}
+      <p class="lift-meta tnum">${bits.join(' · ')}${isStale(l.updated) ? ' <span class="tag">old info</span>' : ''}</p>
+    </li>`;
+  }).join('');
+  const meta = [`<span class="tnum">${st.counts.n} lift${st.counts.n > 1 ? 's' : ''}</span>`];
+  if (st.last) meta.push(`<span>last official check ${ago(st.last)}</span>`);
+  if (state.mode === 'sample') meta.push('<span class="tag sample">Sample</span>');
+  const showPlanB = st.counts.out > 0 || st.counts.ok === 0;
+  el.innerHTML = `
+    <div class="st-head">
+      <h2 class="plaque plaque-lg">${esc(st.name)}</h2>
+      <button type="button" class="save" id="save" aria-pressed="${saved}">${ICON.star}<span>${saved ? 'Saved' : 'Save'}</span></button>
+    </div>
+    <p class="st-meta">${meta.join('<span aria-hidden="true">·</span>')}</p>
+    <div class="verdict ${v.cls}">${v.icon}<div><p class="v-title">${v.title}</p><p class="v-sub">${v.sub}</p></div></div>
+    <h3 class="sub-h">Lifts at this station</h3>
+    <ul class="lifts">${lifts}</ul>
+    ${showPlanB ? renderPlanB(st) : ''}`;
+}
+
+function renderOutages(){
+  let ok = 0, out = 0, unk = 0;
+  for (const s of state.stations){ ok += s.counts.ok; out += s.counts.out; unk += s.counts.unk; }
+  const tot = ok + out + unk;
+  if (!tot){ $('#summary').innerHTML = ''; $('#outages').innerHTML = ''; return; }
+  const pct = n => (n / tot * 100).toFixed(2) + '%';
+  $('#summary').innerHTML = `
+    <div class="bar" role="img" aria-label="${ok} lifts working, ${out} out of service, ${unk} with no status">
+      <span class="seg ok" style="width:${pct(ok)}"></span><span class="seg out${out ? '' : ' zero'}" style="width:${pct(out)}"></span><span class="seg unknown" style="width:${pct(unk)}"></span>
+    </div>
+    <p class="legend tnum"><span><i class="sw ok"></i>${fmtNum(ok)} working</span><span><i class="sw out"></i>${fmtNum(out)} out of service</span><span><i class="sw unknown"></i>${fmtNum(unk)} no status</span></p>`;
+  const list = state.stations.filter(s => s.counts.out > 0)
+    .sort((a, b) => b.counts.out - a.counts.out || a.name.localeCompare(b.name, 'fr'));
+  $('#out-count').textContent = list.length ? `${list.length} station${list.length > 1 ? 's' : ''}` : '';
+  $('#outages').innerHTML = list.length ? list.map(s => {
+    const reasons = [...new Set(s.lifts.filter(l => l.status === 'out').map(l => l.reason).filter(Boolean))].join(', ');
+    return `<li><button type="button" class="row" data-id="${esc(s.id)}"><span class="row-main"><span class="plaque plaque-sm">${esc(s.name)}</span><span class="row-meta"><span class="chip out tnum">${s.counts.out} of ${s.counts.n} out</span>${reasons ? `<span>${esc(reasons)}</span>` : ''}</span></span>${ICON.chev}</button></li>`;
+  }).join('') : '<li class="hint">No lift was reported out of service at the last check.</li>';
+}
+
+function renderAll(){ renderSource(); renderResults(); renderFavs(); renderStation(); renderOutages(); }
+
+/* ---------- Actions ---------- */
+function select(id, scroll){
+  const st = state.stations.find(s => s.id === id);
+  if (!st) return;
+  state.selected = st;
+  $('#q').value = '';
+  renderResults(); renderFavs(); renderStation();
+  if (scroll) $('#station').scrollIntoView({ behavior:reduceMotion ? 'auto' : 'smooth', block:'start' });
+}
+
+function toggleSave(){
+  const st = state.selected;
+  if (!st) return;
+  const i = state.favs.indexOf(st.name);
+  if (i >= 0) state.favs.splice(i, 1); else state.favs.push(st.name);
+  saveFavs(); renderFavs(); renderStation();
+}
+
+function setData(stations, mode){
+  state.stations = stations;
+  state.mode = mode;
+  state.loadedAt = new Date();
+  const fav = state.favs.map(n => stations.find(s => s.name === n)).find(Boolean);
+  // Open on a saved station, otherwise on the station with the most lifts out, so the first view shows Plan B at work.
+  state.selected = fav || [...stations].sort((a, b) => b.counts.out - a.counts.out || b.counts.n - a.counts.n || a.name.localeCompare(b.name, 'fr'))[0] || null;
+  renderAll();
+}
+
+// Data layer: one function to swap for your own backend later (e.g. a proxy that merges PRIM data and crowd reports).
+async function loadLifts(){
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 9000);
+  try {
+    const res = await fetch(LIVE_URL, { signal:ctrl.signal, headers:{ Accept:'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const recs = Array.isArray(json) ? json
+      : Array.isArray(json.results) ? json.results
+      : Array.isArray(json.records) ? json.records.map(r => (r.record && r.record.fields) || r.fields || r)
+      : [];
+    const stations = buildStations(recs);
+    if (!stations.length) throw new Error('No stations in response');
+    return { stations, mode:'live' };
+  } catch (err){
+    return { stations:buildStations(sampleRecords()), mode:'sample' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ---------- Wire up ---------- */
+document.addEventListener('click', e => {
+  const save = e.target.closest('#save');
+  if (save){ toggleSave(); return; }
+  const btn = e.target.closest('[data-id]');
+  if (btn) select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
+});
+const q = $('#q');
+q.addEventListener('input', renderResults);
+q.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){
+    const first = $('#results [data-id]');
+    if (first){ e.preventDefault(); select(first.getAttribute('data-id'), true); }
+  } else if (e.key === 'Escape'){
+    q.value = ''; renderResults();
+  }
+});
+
+// Expose pure helpers for testing outside the page.
+if (typeof window !== 'undefined') window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords };
+
+loadLifts().then(({ stations, mode }) => setData(stations, mode));
+})();
+</script>
+
+</body>
+</html>
