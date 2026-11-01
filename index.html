@@ -186,6 +186,14 @@ button{ font:inherit; color:inherit; }
 .about h2{ color:var(--ink); font-size:1.15rem; }
 .about a{ color:var(--accent); }
 
+.conn{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; color:var(--ink); scroll-margin-top:16px; }
+.conn summary{ cursor:pointer; font-weight:700; }
+.conn-form{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.conn-form .label{ margin-top:4px; }
+.conn-form input{ width:100%; box-sizing:border-box; min-height:46px; padding:10px 12px; font:inherit; color:var(--ink); background:var(--bg); border:1.5px solid var(--line); border-radius:10px; }
+.conn-form input:focus{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.conn-status{ font-size:.88rem; color:var(--muted); min-height:1.2em; }
+
 @media (prefers-reduced-motion: reduce){ .pulse{ animation:none; } }
 </style>
 
@@ -223,6 +231,22 @@ button{ font:inherit; color:inherit; }
     <p>Lift status comes from the Île-de-France Mobilités open dataset <a href="https://data.iledefrance-mobilites.fr/explore/dataset/etat-des-ascenseurs/" target="_blank" rel="noopener">État des ascenseurs</a>. Station staff check lifts on their rounds and the feed updates about three times a day, so a lift can break after the last check.</p>
     <p>The feed only lists stations that IDFM counts as accessible. If a station isn't here, expect stairs. Metro line 14 has lifts at every station.</p>
     <p>Prototype. Always follow station signage and staff on the day.</p>
+    <details id="conn" class="conn">
+      <summary>Connect to IDFM with your API key</summary>
+      <form id="conn-form" class="conn-form" novalidate>
+        <p>IDFM's lift feed refuses requests without an API key. Create a free account on <a href="https://prim.iledefrance-mobilites.fr/" target="_blank" rel="noopener">PRIM</a>, copy your API key from your account page, and paste it here. It is saved only in this browser.</p>
+        <label for="k" class="label">PRIM API key</label>
+        <input id="k" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key">
+        <label for="u" class="label">Data address (optional)</label>
+        <input id="u" type="url" autocomplete="off" spellcheck="false" placeholder="API link from the dataset's PRIM page">
+        <p class="fine">Leave the address empty to use IDFM's standard one. If PRIM's <a href="https://prim.iledefrance-mobilites.fr/en/jeux-de-donnees/etat-des-ascenseurs" target="_blank" rel="noopener">État des ascenseurs page</a> shows a different API link, paste it here.</p>
+        <div class="src-actions">
+          <button type="submit" class="btn">Save and load live data</button>
+          <button type="button" id="forget" class="btn">Remove key</button>
+        </div>
+        <p id="conn-status" class="conn-status" role="status"></p>
+      </form>
+    </details>
   </footer>
 </div>
 
@@ -231,20 +255,22 @@ button{ font:inherit; color:inherit; }
 'use strict';
 
 /* ---------- Config ---------- */
-// Public IDFM open-data endpoints (Opendatasoft). No API key needed. Tried in order; add ?src=<url> to the page address to try another one first.
+// IDFM lift-status endpoints (Opendatasoft API). The feed refuses anonymous requests, so the page sends a free PRIM API key
+// that the viewer types in; it stays in their browser only. Add ?src=<url> to the page address to try another endpoint first.
 const IDFM = 'https://data.iledefrance-mobilites.fr';
 const DATASET = 'etat-des-ascenseurs';
-const TEST_URL = `${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/exports/json`;
+const CFG_KEY = 'lift-or-stairs:idfm';
 function liveSources(){
   const list = [];
+  const paged = url => /\/records(\?|$)/.test(url);
   try {
     const custom = new URLSearchParams(location.search).get('src');
-    if (custom) list.push({ label:'Custom source (?src=)', url:custom });
+    if (custom) list.push({ label:'Custom source (?src=)', url:custom, paged:paged(custom) });
   } catch (e){}
+  if (state.cfg.url) list.push({ label:'Your data URL', url:state.cfg.url, paged:paged(state.cfg.url) });
   list.push(
-    { label:'Explore API v2.1 · full export', url:`${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/exports/json` },
     { label:'Explore API v2.1 · records, page by page', url:`${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/records`, paged:true },
-    { label:'Records API v1', url:`${IDFM}/api/records/1.0/search/?dataset=${DATASET}&rows=10000` }
+    { label:'Explore API v2.1 · full export', url:`${IDFM}/api/explore/v2.1/catalog/datasets/${DATASET}/exports/json` }
   );
   return list;
 }
@@ -486,7 +512,15 @@ function sampleRecords(){
 /* ---------- State ---------- */
 const $ = s => document.querySelector(s);
 const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:loadFavs(), diag:[], source:'', fileError:'' };
+const state = { stations:[], selected:null, mode:'loading', loadedAt:null, favs:loadFavs(), diag:[], source:'', fileError:'', cfg:loadCfg() };
+
+function loadCfg(){
+  try {
+    const v = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    return { key:typeof v.key === 'string' ? v.key : '', url:typeof v.url === 'string' ? v.url : '' };
+  } catch (e){ return { key:'', url:'' }; }
+}
+function saveCfg(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(state.cfg)); } catch (e){} }
 
 function loadFavs(){
   try { const v = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
@@ -511,12 +545,12 @@ function renderSource(){
     el.innerHTML = `<span class="dot ok"></span><span><strong>Real IDFM data from your file</strong> · ${esc(state.source)} · ${counts}. It won't update by itself; load a fresh export to refresh.</span>`;
   } else {
     el.className = 'source sample';
-    const steps = state.diag.map(d => `<li><b>${esc(d.label)}</b><br><span class="diag-url">${esc(d.url)}</span><br>${esc(d.detail)}</li>`).join('');
+    const keyNote = state.cfg.key ? ' Sent with your API key.' : '';
+    const steps = state.diag.map(d => `<li><b>${esc(d.label)}</b><br><span class="diag-url">${esc(d.url)}</span><br>${esc(d.detail)}${keyNote}</li>`).join('');
     el.innerHTML = `<strong>Sample data</strong>
-      <span>The live IDFM feed didn't load, so the statuses below are made up to show how the app works.</span>
+      <span>The live IDFM feed didn't load, so the statuses below are made up to show how the app works.${state.cfg.key ? '' : ` IDFM now needs a free API key: <a href="#conn" class="open-conn">add yours</a>.`}</span>
       <details class="diag"><summary>Why didn't the live feed load?</summary>
         <ol>${steps}</ol>
-        <p>To test the feed itself, open <a href="${TEST_URL}" target="_blank" rel="noopener">the IDFM export link</a>. If it shows data, IDFM is refusing requests from other websites, and the file option below or a small proxy server gets around it.</p>
       </details>
       ${state.fileError ? `<p class="diag-err">${esc(state.fileError)}</p>` : ''}
       <div class="src-actions">
@@ -668,18 +702,32 @@ function setData(r){
 // Swap this for your own backend later (e.g. a proxy that merges PRIM data and parents' reports).
 function loadError(detail){ const e = new Error(detail); e.detail = detail; return e; }
 
+// PRIM marketplace addresses take the key as an "apikey" header; Opendatasoft addresses take it as an apikey query parameter.
+function keyed(url, key){
+  if (!key) return { url, headers:{} };
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'prim.iledefrance-mobilites.fr') return { url, headers:{ apikey:key } };
+    u.searchParams.set('apikey', key);
+    return { url:u.toString(), headers:{} };
+  } catch (e){ return { url, headers:{} }; }
+}
+
 async function fetchJson(url, ms){
+  const key = state.cfg.key;
+  const req = keyed(url, key);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
     let res;
-    try { res = await fetch(url, { signal:ctrl.signal }); }
+    try { res = await fetch(req.url, { signal:ctrl.signal, headers:req.headers }); }
     catch (e){
       throw loadError(e && e.name === 'AbortError'
         ? `No answer after ${ms / 1000} s.`
         : 'Request blocked or server unreachable. In a normal browser this usually means the server refuses requests from other websites (CORS).');
     }
-    if (!res.ok) throw loadError(`Server answered HTTP ${res.status}${res.status === 404 ? ' (not found: the dataset may have moved)' : res.status === 401 || res.status === 403 ? ' (needs a login or API key)' : ''}.`);
+    const denied = res.status === 401 || res.status === 403;
+    if (!res.ok) throw loadError(`Server answered HTTP ${res.status}${res.status === 404 ? ' (not found: the dataset may have moved)' : denied ? (key ? ' (your API key was refused for this address)' : ' (needs an API key)') : ''}.`);
     try { return await res.json(); }
     catch (e){ throw loadError('Server answered, but not with JSON data.'); }
   } finally { clearTimeout(timer); }
@@ -700,7 +748,10 @@ function extractRecords(json){
 async function fetchPaged(url){
   const all = [];
   for (let offset = 0; offset < 10000; offset += 100){
-    const json = await fetchJson(`${url}?limit=100&offset=${offset}`, 10000);
+    const u = new URL(url);
+    u.searchParams.set('limit', '100');
+    u.searchParams.set('offset', String(offset));
+    const json = await fetchJson(u.toString(), 10000);
     const recs = extractRecords(json);
     all.push(...recs);
     const total = json && typeof json.total_count === 'number' ? json.total_count : null;
@@ -773,13 +824,40 @@ function retryLive(){
   state.fileError = '';
   state.mode = 'loading';
   renderSource();
-  loadLifts().then(setData);
+  loadLifts().then(r => {
+    setData(r);
+    const msg = $('#conn-status');
+    if (msg) msg.textContent = r.mode === 'live'
+      ? 'Connected. Live data loaded.'
+      : 'Still no live data. Open “Why didn\'t the live feed load?” at the top to see what IDFM answered.';
+  });
+}
+
+function wireConnection(){
+  $('#k').value = state.cfg.key;
+  $('#u').value = state.cfg.url;
+  $('#conn-form').addEventListener('submit', e => {
+    e.preventDefault();
+    state.cfg = { key:$('#k').value.trim(), url:$('#u').value.trim() };
+    saveCfg();
+    $('#conn-status').textContent = 'Saved in this browser. Loading…';
+    retryLive();
+    window.scrollTo({ top:0, behavior:reduceMotion ? 'auto' : 'smooth' });
+  });
+  $('#forget').addEventListener('click', () => {
+    state.cfg = { key:'', url:'' };
+    saveCfg();
+    $('#k').value = ''; $('#u').value = '';
+    $('#conn-status').textContent = 'Key removed from this browser.';
+    retryLive();
+  });
 }
 
 /* ---------- Wire up ---------- */
 document.addEventListener('click', e => {
   if (e.target.closest('#save')){ toggleSave(); return; }
   if (e.target.closest('#retry')){ retryLive(); return; }
+  if (e.target.closest('.open-conn')){ $('#conn').open = true; return; }
   const btn = e.target.closest('[data-id]');
   if (btn) select(btn.getAttribute('data-id'), !btn.classList.contains('fav'));
 });
@@ -799,8 +877,9 @@ document.addEventListener('change', e => {
 });
 
 // Expose pure helpers for testing outside the page.
-window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords };
+window.__liftOrStairs = { buildStations, verdict, planB, normStatus, reasonLabel, l93ToWgs84, sampleRecords, parseCsv, extractRecords, keyed, loadLifts };
 
+wireConnection();
 loadLifts().then(setData);
 })();
 </script>
